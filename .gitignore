@@ -1,0 +1,20 @@
+# Node/React
+node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+
+# .NET / C#
+bin/
+obj/
+.vs/
+*.user
+appsettings.Development.json
+
+# Local Connection Configuration (sensitive data)
+connection.json
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini

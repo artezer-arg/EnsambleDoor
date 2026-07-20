@@ -1,0 +1,389 @@
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Threading.Tasks;
+using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Configuration;
+using Dapper;
+using Backend.Models;
+
+using System.IO;
+
+namespace Backend.Services
+{
+    public class DatabaseService : IDatabaseService
+    {
+        private readonly string _connectionString;
+        private static string? _cachedConnectionString;
+        private static readonly object _connLock = new object();
+
+        public static string ConnectionStringFile => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "connection.json");
+
+        public DatabaseService(IConfiguration configuration)
+        {
+            lock (_connLock)
+            {
+                if (_cachedConnectionString == null)
+                {
+                    _cachedConnectionString = LoadConnectionString(configuration);
+                }
+                _connectionString = _cachedConnectionString;
+            }
+        }
+
+        private static string LoadConnectionString(IConfiguration configuration)
+        {
+            try
+            {
+                if (File.Exists(ConnectionStringFile))
+                {
+                    string json = File.ReadAllText(ConnectionStringFile);
+                    using (var doc = System.Text.Json.JsonDocument.Parse(json))
+                    {
+                        if (doc.RootElement.TryGetProperty("ConnectionString", out var prop))
+                        {
+                            return prop.GetString() ?? string.Empty;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error loading connection.json: {ex.Message}");
+            }
+
+            return configuration.GetConnectionString("DefaultConnection") 
+                ?? "Server=localhost;Database=TB-L;Trusted_Connection=True;TrustServerCertificate=True;";
+        }
+
+        public static string GetCurrentConnectionString()
+        {
+            lock (_connLock)
+            {
+                if (_cachedConnectionString == null)
+                {
+                    // Fallback load
+                    try
+                    {
+                        if (File.Exists(ConnectionStringFile))
+                        {
+                            string json = File.ReadAllText(ConnectionStringFile);
+                            using (var doc = System.Text.Json.JsonDocument.Parse(json))
+                            {
+                                if (doc.RootElement.TryGetProperty("ConnectionString", out var prop))
+                                {
+                                    _cachedConnectionString = prop.GetString();
+                                }
+                            }
+                        }
+                    }
+                    catch { }
+
+                    if (string.IsNullOrEmpty(_cachedConnectionString))
+                    {
+                        _cachedConnectionString = "Server=localhost;Database=TB-L;Trusted_Connection=True;TrustServerCertificate=True;";
+                    }
+                }
+                return _cachedConnectionString;
+            }
+        }
+
+        public static void UpdateConnectionString(string newConnString)
+        {
+            lock (_connLock)
+            {
+                _cachedConnectionString = newConnString;
+                string json = System.Text.Json.JsonSerializer.Serialize(new { ConnectionString = newConnString });
+                File.WriteAllText(ConnectionStringFile, json);
+            }
+        }
+
+        private SqlConnection GetConnection() => new SqlConnection(GetCurrentConnectionString());
+
+        public async Task<bool> TestConnectionAsync(string connString)
+        {
+            try
+            {
+                using var conn = new SqlConnection(connString);
+                await conn.OpenAsync();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public async Task<DateTime> GetServerDateTimeAsync()
+        {
+            using var conn = GetConnection();
+            return await conn.QuerySingleAsync<DateTime>("SELECT GETDATE();");
+        }
+
+        public async Task<PanelSequence?> GetNextPanelAsync(string puesto)
+        {
+            using var conn = GetConnection();
+            var result = await conn.QueryFirstOrDefaultAsync<PanelSequence>(
+                "dbo.SP_ObtenerSiguientePanel", 
+                new { Puesto = puesto }, 
+                commandType: CommandType.StoredProcedure
+            );
+            return result;
+        }
+
+        public async Task<Equivalencia?> GetEquivalenceAsync(string codigoPanel)
+        {
+            using var conn = GetConnection();
+            string sql = "SELECT * FROM dbo.Equivalencia_Panel_Ornamento WHERE CodigoPanel = @CodigoPanel AND Activo = 1;";
+            return await conn.QueryFirstOrDefaultAsync<Equivalencia>(sql, new { CodigoPanel = codigoPanel.Trim() });
+        }
+
+        public async Task<IEnumerable<Equivalencia>> GetEquivalencesAsync()
+        {
+            using var conn = GetConnection();
+            string sql = "SELECT * FROM dbo.Equivalencia_Panel_Ornamento ORDER BY ID_Equivalencia DESC;";
+            return await conn.QueryAsync<Equivalencia>(sql);
+        }
+
+        public async Task<bool> UpsertEquivalenceAsync(Equivalencia equiv, string user)
+        {
+            using var conn = GetConnection();
+            string sql = @"
+                MERGE dbo.Equivalencia_Panel_Ornamento AS Target
+                USING (SELECT @CodigoPanel AS CodigoPanel) AS Source
+                ON (Target.CodigoPanel = Source.CodigoPanel AND Target.Activo = 1)
+                WHEN MATCHED THEN
+                    UPDATE SET 
+                        CodigoOrnamento = @CodigoOrnamento,
+                        RequiereOrnamento = @RequiereOrnamento,
+                        FechaModificacion = GETDATE(),
+                        UsuarioModificacion = @User
+                WHEN NOT MATCHED THEN
+                    INSERT (CodigoPanel, CodigoOrnamento, RequiereOrnamento, Activo, FechaDesde, UsuarioModificacion)
+                    VALUES (@CodigoPanel, @CodigoOrnamento, @RequiereOrnamento, 1, GETDATE(), @User);";
+            
+            var rows = await conn.ExecuteAsync(sql, new {
+                CodigoPanel = equiv.CodigoPanel.Trim().ToUpper(),
+                CodigoOrnamento = equiv.CodigoOrnamento?.Trim().ToUpper(),
+                equiv.RequiereOrnamento,
+                User = user
+            });
+            return rows > 0;
+        }
+
+        public async Task<bool> DeleteEquivalenceAsync(int id)
+        {
+            using var conn = GetConnection();
+            string sql = "UPDATE dbo.Equivalencia_Panel_Ornamento SET Activo = 0, FechaHasta = GETDATE() WHERE ID_Equivalencia = @Id;";
+            var rows = await conn.ExecuteAsync(sql, new { Id = id });
+            return rows > 0;
+        }
+
+        public async Task<string> GetConfigValueAsync(string key, string defaultValue = "")
+        {
+            using var conn = GetConnection();
+            string sql = "SELECT Valor FROM dbo.Configuracion_Sistema WHERE Clave = @Key;";
+            var value = await conn.QueryFirstOrDefaultAsync<string>(sql, new { Key = key });
+            return value ?? defaultValue;
+        }
+
+        public async Task<Dictionary<string, string>> GetConfigsAsync()
+        {
+            using var conn = GetConnection();
+            string sql = "SELECT Clave, Valor FROM dbo.Configuracion_Sistema;";
+            var rows = await conn.QueryAsync<(string Clave, string Valor)>(sql);
+            var dict = new Dictionary<string, string>();
+            foreach (var r in rows)
+            {
+                dict[r.Clave] = r.Valor;
+            }
+            return dict;
+        }
+
+        public async Task<bool> UpdateConfigValueAsync(string key, string value, string user, string? motivo)
+        {
+            using var conn = GetConnection();
+            await conn.OpenAsync();
+            using var transaction = conn.BeginTransaction();
+            try
+            {
+                // Get old value
+                string selectSql = "SELECT Valor FROM dbo.Configuracion_Sistema WITH (UPDLOCK, HOLDLOCK) WHERE Clave = @Key;";
+                var oldValue = await conn.QueryFirstOrDefaultAsync<string>(selectSql, new { Key = key }, transaction);
+
+                // Update configuration
+                string updateSql = @"
+                    UPDATE dbo.Configuracion_Sistema 
+                    SET Valor = @Value, FechaModificacion = GETDATE(), UsuarioModificacion = @User
+                    WHERE Clave = @Key;";
+                var rows = await conn.ExecuteAsync(updateSql, new { Key = key, Value = value, User = user }, transaction);
+
+                if (rows == 0)
+                {
+                    // Key doesn't exist, insert it
+                    string insertSql = @"
+                        INSERT INTO dbo.Configuracion_Sistema (Clave, Valor, Descripcion, FechaModificacion, UsuarioModificacion)
+                        VALUES (@Key, @Value, 'Configuracion dinámica', GETDATE(), @User);";
+                    await conn.ExecuteAsync(insertSql, new { Key = key, Value = value, User = user }, transaction);
+                }
+
+                // Log audit trail
+                string auditSql = @"
+                    INSERT INTO dbo.Auditoria_Configuracion (Clave, ValorAnterior, ValorNuevo, FechaModificacion, UsuarioModificacion, Motivo)
+                    VALUES (@Key, @OldValue, @Value, GETDATE(), @User, @Motivo);";
+                await conn.ExecuteAsync(auditSql, new { Key = key, OldValue = oldValue, Value = value, User = user, Motivo = motivo }, transaction);
+
+                transaction.Commit();
+                return true;
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
+            }
+        }
+
+        public async Task<IEnumerable<AuditConfig>> GetConfigAuditsAsync()
+        {
+            using var conn = GetConnection();
+            string sql = "SELECT * FROM dbo.Auditoria_Configuracion ORDER BY ID_Auditoria DESC;";
+            return await conn.QueryAsync<AuditConfig>(sql);
+        }
+
+        public async Task<bool> CheckQrProcessedAsync(string qr)
+        {
+            using var conn = GetConnection();
+            string sql = "SELECT COUNT(1) FROM dbo.Validacion_Ornamento WHERE QrCompleto = @Qr AND ResultadoGeneral = 'APROBADO';";
+            var count = await conn.QuerySingleAsync<int>(sql, new { Qr = qr.Trim() });
+            return count > 0;
+        }
+
+        public async Task<Validacion?> GetPriorValidationByQrAsync(string qr)
+        {
+            using var conn = GetConnection();
+            string sql = "SELECT TOP 1 * FROM dbo.Validacion_Ornamento WHERE QrCompleto = @Qr AND ResultadoGeneral = 'APROBADO' ORDER BY ID_Validacion DESC;";
+            return await conn.QueryFirstOrDefaultAsync<Validacion>(sql, new { Qr = qr.Trim() });
+        }
+
+        public async Task<int> InsertValidationLogAsync(Validacion log)
+        {
+            using var conn = GetConnection();
+            string sql = @"
+                INSERT INTO dbo.Validacion_Ornamento
+                (
+                    ID_Operacion, ID_OrdenProduccion, ID_OrdenCliente, Orden, Secuencia, SD, Referencia,
+                    CodigoOrnamentoEsperado, CodigoOrnamentoLeido, QrCompleto, NumeroSerie, Lote,
+                    InicioCurado, FechaActualServidor, MinutosCurado, TiempoMinimoRequerido,
+                    ResultadoCurado, ResultadoCorrespondencia, ResultadoGeneral, MotivoRechazo,
+                    Puesto, Operador, FechaLectura, EstadoImpresion, MensajeErrorTecnico
+                )
+                VALUES
+                (
+                    @ID_Operacion, @ID_OrdenProduccion, @ID_OrdenCliente, @Orden, @Secuencia, @SD, @Referencia,
+                    @CodigoOrnamentoEsperado, @CodigoOrnamentoLeido, @QrCompleto, @NumeroSerie, @Lote,
+                    @InicioCurado, GETDATE(), @MinutosCurado, @TiempoMinimoRequerido,
+                    @ResultadoCurado, @ResultadoCorrespondencia, @ResultadoGeneral, @MotivoRechazo,
+                    @Puesto, @Operador, GETDATE(), @EstadoImpresion, @MensajeErrorTecnico
+                );
+                SELECT CAST(SCOPE_IDENTITY() as int);";
+            
+            return await conn.QuerySingleAsync<int>(sql, log);
+        }
+
+        public async Task<bool> UpdateValidationPrintStatusAsync(int id, string status, string? printer, string? technicalError)
+        {
+            using var conn = GetConnection();
+            string sql = @"
+                UPDATE dbo.Validacion_Ornamento 
+                SET EstadoImpresion = @Status,
+                    Impresora = @Printer,
+                    FechaImpresion = CASE WHEN @Status = 'COMPLETO' THEN GETDATE() ELSE FechaImpresion END,
+                    MensajeErrorTecnico = @TechnicalError
+                WHERE ID_Validacion = @Id;";
+            var rows = await conn.ExecuteAsync(sql, new { Id = id, Status = status, Printer = printer, TechnicalError = technicalError });
+            return rows > 0;
+        }
+
+        public async Task<bool> UpdateValidationPointerAdvancedAsync(int id)
+        {
+            using var conn = GetConnection();
+            string sql = "UPDATE dbo.Validacion_Ornamento SET FechaAvancePuntero = GETDATE() WHERE ID_Validacion = @Id;";
+            var rows = await conn.ExecuteAsync(sql, new { Id = id });
+            return rows > 0;
+        }
+
+        public async Task CompletePanelProcessAsync(int idOrdenProduccion, int idOrdenCliente, string puesto, int orden)
+        {
+            using var conn = GetConnection();
+            await conn.ExecuteAsync(
+                "dbo.SP_FinalizarProcesoPanel",
+                new 
+                {
+                    ID_OrdenProduccion = idOrdenProduccion,
+                    ID_OrdenCliente = idOrdenCliente,
+                    Puesto = puesto,
+                    Orden = orden
+                },
+                commandType: CommandType.StoredProcedure
+            );
+        }
+
+        public async Task<IEnumerable<Validacion>> GetValidationHistoryAsync(
+            DateTime? desde, DateTime? hasta, string? panel, string? ornament, 
+            int? ordenId, int? secuencia, string? puesto, string? result, string? motivo)
+        {
+            using var conn = GetConnection();
+            var sql = "SELECT * FROM dbo.Validacion_Ornamento WHERE 1=1";
+            var parameters = new DynamicParameters();
+
+            if (desde.HasValue)
+            {
+                sql += " AND FechaLectura >= @Desde";
+                parameters.Add("Desde", desde.Value);
+            }
+            if (hasta.HasValue)
+            {
+                sql += " AND FechaLectura <= @Hasta";
+                parameters.Add("Hasta", hasta.Value);
+            }
+            if (!string.IsNullOrEmpty(panel))
+            {
+                sql += " AND Referencia LIKE @Panel";
+                parameters.Add("Panel", "%" + panel.Trim() + "%");
+            }
+            if (!string.IsNullOrEmpty(ornament))
+            {
+                sql += " AND (CodigoOrnamentoEsperado LIKE @Orn OR CodigoOrnamentoLeido LIKE @Orn)";
+                parameters.Add("Orn", "%" + ornament.Trim() + "%");
+            }
+            if (ordenId.HasValue)
+            {
+                sql += " AND ID_OrdenProduccion = @OrdenId";
+                parameters.Add("OrdenId", ordenId.Value);
+            }
+            if (secuencia.HasValue)
+            {
+                sql += " AND Secuencia = @Secuencia";
+                parameters.Add("Secuencia", secuencia.Value);
+            }
+            if (!string.IsNullOrEmpty(puesto))
+            {
+                sql += " AND Puesto = @Puesto";
+                parameters.Add("Puesto", puesto.Trim());
+            }
+            if (!string.IsNullOrEmpty(result))
+            {
+                sql += " AND ResultadoGeneral = @Result";
+                parameters.Add("Result", result.Trim());
+            }
+            if (!string.IsNullOrEmpty(motivo))
+            {
+                sql += " AND MotivoRechazo LIKE @Motivo";
+                parameters.Add("Motivo", "%" + motivo.Trim() + "%");
+            }
+
+            sql += " ORDER BY ID_Validacion DESC";
+            return await conn.QueryAsync<Validacion>(sql, parameters);
+        }
+    }
+}

@@ -1,0 +1,76 @@
+using System;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
+using Backend.Services;
+
+namespace Backend.Controllers
+{
+    [ApiController]
+    [Route("api/[controller]")]
+    public class SequenceController : ControllerBase
+    {
+        private readonly IDatabaseService _dbService;
+
+        public SequenceController(IDatabaseService dbService)
+        {
+            _dbService = dbService;
+        }
+
+        [HttpGet("next")]
+        public async Task<IActionResult> GetNext([FromQuery] string puesto)
+        {
+            if (string.IsNullOrEmpty(puesto))
+            {
+                return BadRequest("El puesto es requerido.");
+            }
+
+            try
+            {
+                var nextPanel = await _dbService.GetNextPanelAsync(puesto);
+                if (nextPanel == null)
+                {
+                    return NotFound(new { message = $"SIN PANELES PENDIENTES PARA EL PUESTO {puesto.ToUpper()}" });
+                }
+                return Ok(nextPanel);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error de conexión con la base de datos.", detail = ex.Message });
+            }
+        }
+
+        [HttpPost("complete")]
+        public async Task<IActionResult> Complete([FromBody] CompleteRequest request)
+        {
+            if (request == null) return BadRequest("Datos inválidos.");
+
+            try
+            {
+                await _dbService.CompletePanelProcessAsync(
+                    request.ID_OrdenProduccion, 
+                    request.ID_OrdenCliente, 
+                    request.Puesto, 
+                    request.Orden
+                );
+                return Ok(new { success = true, message = "Secuencia avanzada correctamente." });
+            }
+            catch (SqlException ex) when (ex.Number == 50001 || ex.Number == 50002)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "Error al completar la secuencia.", detail = ex.Message });
+            }
+        }
+    }
+
+    public class CompleteRequest
+    {
+        public int ID_OrdenProduccion { get; set; }
+        public int ID_OrdenCliente { get; set; }
+        public string Puesto { get; set; } = string.Empty;
+        public int Orden { get; set; }
+    }
+}
