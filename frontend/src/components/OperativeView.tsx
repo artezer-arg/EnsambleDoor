@@ -117,6 +117,7 @@ interface Panel {
   fechaSecuencia?: string;
   mano?: string;
   posicion?: string;
+  requiereOrnamento?: boolean;
 }
 
 interface ValidationResult {
@@ -911,7 +912,7 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
                     <RefreshCw className="pulse" size={48} style={{ marginBottom: '16px', color: 'var(--accent-color)' }} />
                     <span>PROCESANDO ANÁLISIS DE BARCODE...</span>
                   </>
-                ) : (currentPanel && (currentPanel.referencia === '67640-0KF40-C0' || currentPanel.referencia === '67630-0KF30-C0')) ? (
+                ) : (currentPanel && currentPanel.requiereOrnamento === false) ? (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', width: '100%' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#10b981' }}>
                       <AlertTriangle size={36} className="pulse" />

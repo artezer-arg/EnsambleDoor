@@ -32,7 +32,25 @@ namespace Backend.Controllers
                 {
                     return NotFound(new { message = $"SIN PANELES PENDIENTES PARA EL PUESTO {puesto.ToUpper()}" });
                 }
-                return Ok(nextPanel);
+
+                // Check equivalence mapping dynamically to see if ornament is required
+                var equiv = await _dbService.GetEquivalenceAsync(nextPanel.Referencia);
+                bool requiereOrnamento = equiv?.RequiereOrnamento ?? true; // Default to true if not configured
+
+                return Ok(new {
+                    nextPanel.Referencia,
+                    nextPanel.ID_OrdenProduccion,
+                    nextPanel.ID_OrdenCliente,
+                    nextPanel.Orden,
+                    nextPanel.Secuencia,
+                    nextPanel.SD,
+                    nextPanel.Expr1,
+                    nextPanel.Puesto,
+                    nextPanel.FechaSecuencia,
+                    nextPanel.Mano,
+                    nextPanel.Posicion,
+                    RequiereOrnamento = requiereOrnamento
+                });
             }
             catch (Exception ex)
             {
