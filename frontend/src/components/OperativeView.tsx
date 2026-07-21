@@ -230,12 +230,30 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
         
         if (response.ok) {
           const data = await response.json();
-          setCurrentPanel(data);
+          
+          // Normalize backend properties to standard camelCase HMI model
+          const normalizedData: Panel = {
+            referencia: data.referencia || data.Referencia || '',
+            iD_OrdenProduccion: data.iD_OrdenProduccion !== undefined ? data.iD_OrdenProduccion : (data.ID_OrdenProduccion !== undefined ? data.ID_OrdenProduccion : 0),
+            iD_OrdenCliente: data.iD_OrdenCliente !== undefined ? data.iD_OrdenCliente : (data.ID_OrdenCliente !== undefined ? data.ID_OrdenCliente : 0),
+            orden: data.orden !== undefined ? data.orden : (data.Orden !== undefined ? data.Orden : 0),
+            secuencia: data.secuencia !== undefined ? data.secuencia : (data.Secuencia !== undefined ? data.Secuencia : 0),
+            sd: data.sd || data.SD || '',
+            expr1: data.expr1 || data.Expr1 || '',
+            puesto: data.puesto || data.Puesto || '',
+            fechaSecuencia: data.fechaSecuencia || data.FechaSecuencia,
+            mano: data.mano || data.Mano || '',
+            posicion: data.posicion || data.Posicion || '',
+            requiereOrnamento: data.requiereOrnamento !== undefined ? data.requiereOrnamento : (data.RequiereOrnamento !== undefined ? data.RequiereOrnamento : true)
+          };
+
+          setCurrentPanel(normalizedData);
           setNoPanelsMessage('');
+          
           // Update visual footer to waiting for scan or no ornament
           const responseEquiv = await fetch(`${apiBaseUrl}/api/equivalence`);
           const equivalences = await responseEquiv.json();
-          const match = equivalences.find((e: any) => e.codigoPanel.toUpperCase().trim() === data.referencia.toUpperCase().trim() && e.activo);
+          const match = equivalences.find((e: any) => e.codigoPanel.toUpperCase().trim() === normalizedData.referencia.toUpperCase().trim() && e.activo);
           
           if (!match) {
             setFooterState('error');
