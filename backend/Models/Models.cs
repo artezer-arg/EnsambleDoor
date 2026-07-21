@@ -12,6 +12,7 @@ namespace Backend.Models
         public string SD { get; set; } = string.Empty;
         public string Expr1 { get; set; } = string.Empty;
         public string Puesto { get; set; } = string.Empty;
+        public DateTime? FechaSecuencia { get; set; }
     }
 
     public class Equivalencia

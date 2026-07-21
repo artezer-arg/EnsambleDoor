@@ -47,7 +47,8 @@ BEGIN
         Secuencia,
         SD,
         Expr1,
-        Puesto
+        Puesto,
+        Fecha_Secuencia AS FechaSecuencia
     FROM Consulta_Principal;
 END;
 GO

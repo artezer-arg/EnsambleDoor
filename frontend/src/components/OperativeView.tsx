@@ -56,6 +56,7 @@ interface Panel {
   sd: string;
   expr1: string;
   puesto: string;
+  fechaSecuencia?: string;
 }
 
 interface ValidationResult {
@@ -596,27 +597,74 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
 
             {currentPanel ? (
               <div className="slide-up">
-                <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '4px' }}>CÓDIGO PANEL DE PLANTA:</div>
-                <div style={{ fontSize: '42px', fontWeight: 900, color: '#ffffff', letterSpacing: '1px', textShadow: '0 0 10px rgba(255,255,255,0.1)', lineHeight: '1.2' }}>
-                  {currentPanel.referencia}
+                {/* 1. Código de Panel */}
+                <div style={{ marginBottom: '20px', borderBottom: '1px dashed rgba(255,255,255,0.06)', paddingBottom: '12px' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Código Panel de Planta
+                  </span>
+                  <strong style={{ fontSize: '26px', fontWeight: 800, color: '#ffffff', letterSpacing: '0.5px' }}>
+                    {currentPanel.referencia}
+                  </strong>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginTop: '30px' }}>
+                {/* 2. GRANDES (SD, Secuencia, Fecha) */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '20px' }}>
+                  
+                  {/* Fila superior: SD y Secuencia al lado */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    {/* SD en grande */}
+                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.2)' }}>
+                      <span style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px', marginBottom: '4px' }}>
+                        SD (Modelo)
+                      </span>
+                      <strong style={{ fontSize: '42px', fontWeight: 900, color: '#10b981', display: 'block', lineHeight: 1 }}>
+                        {currentPanel.sd || 'N/A'}
+                      </strong>
+                    </div>
+
+                    {/* Secuencia en grande */}
+                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.2)' }}>
+                      <span style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px', marginBottom: '4px' }}>
+                        Nro. Secuencia
+                      </span>
+                      <strong style={{ fontSize: '42px', fontWeight: 900, color: 'var(--accent-color)', display: 'block', lineHeight: 1 }}>
+                        {currentPanel.secuencia}
+                      </strong>
+                    </div>
+                  </div>
+
+                  {/* Fila: Fecha Secuencia en grande */}
+                  <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.2)' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px', marginBottom: '4px' }}>
+                      Fecha de Secuencia
+                    </span>
+                    <strong style={{ fontSize: '28px', fontWeight: 800, color: '#f59e0b', display: 'block', lineHeight: 1.1 }}>
+                      {currentPanel.fechaSecuencia 
+                        ? new Date(currentPanel.fechaSecuencia).toLocaleString('es-AR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })
+                        : 'N/A'}
+                    </strong>
+                  </div>
+                </div>
+
+                {/* 3. Datos Auxiliares Menores */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', background: 'rgba(255,255,255,0.01)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)' }}>
                   <div>
-                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block' }}>NRO. SECUENCIA:</span>
-                    <strong style={{ fontSize: '24px', color: 'var(--accent-color)' }}>{currentPanel.secuencia}</strong>
+                    <span style={{ fontSize: '10px', color: 'var(--text-secondary)', display: 'block' }}>ORDEN COLA:</span>
+                    <strong style={{ fontSize: '15px', color: '#ffffff' }}>{currentPanel.orden}</strong>
                   </div>
                   <div>
-                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block' }}>ORDEN EN COLA:</span>
-                    <strong style={{ fontSize: '24px' }}>{currentPanel.orden}</strong>
+                    <span style={{ fontSize: '10px', color: 'var(--text-secondary)', display: 'block' }}>OP ID:</span>
+                    <strong style={{ fontSize: '15px', color: '#ffffff' }}>{currentPanel.iD_OrdenProduccion}</strong>
                   </div>
                   <div>
-                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block' }}>ID DE ORDEN DE PRODUCCIÓN:</span>
-                    <strong style={{ fontSize: '18px' }}>{currentPanel.iD_OrdenProduccion}</strong>
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block' }}>POSICIÓN Y MANO (EXPR1):</span>
-                    <strong style={{ fontSize: '20px', color: '#10b981' }}>{currentPanel.expr1 || 'F - N/A'}</strong>
+                    <span style={{ fontSize: '10px', color: 'var(--text-secondary)', display: 'block' }}>MANO/POS:</span>
+                    <strong style={{ fontSize: '15px', color: '#a855f7' }}>{currentPanel.expr1 || 'N/A'}</strong>
                   </div>
                 </div>
 
