@@ -345,7 +345,7 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
     // Intercept control commands scanned via barcode gun
     const command = normalizedQr.toUpperCase();
     if (command === 'CMD-NO-ORN') {
-      if ((currentPanel.referencia === '67640-0KF40-C0' || currentPanel.referencia === '67630-0KF30-C0') && !isProcessing && !validationResult) {
+      if (currentPanel.requiereOrnamento === false && !isProcessing && !validationResult) {
         handleConfirmNoOrnament();
       }
       return;
@@ -611,7 +611,7 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
     setLabelPreview(null);
     setRemainingMinText('');
     setFooterState('waiting');
-    setFooterText(currentPanel && currentPanel.referencia === '67640-0KF40-C0' || currentPanel?.referencia === '67630-0KF30-C0' ? 'ESTE PANEL NO LLEVA ORNAMENTO' : 'ESPERANDO LECTURA DE QR');
+    setFooterText(currentPanel && currentPanel.requiereOrnamento === false ? 'ESTE PANEL NO LLEVA ORNAMENTO' : 'ESPERANDO LECTURA DE QR');
   };
 
   // UI State Background Color Class mapping
