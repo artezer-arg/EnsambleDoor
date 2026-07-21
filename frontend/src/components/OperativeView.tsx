@@ -756,21 +756,7 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
                   </div>
                 </div>
 
-                {/* Case B: Panel does not require ornament */}
-                {(currentPanel.referencia === '67640-0KF40-C0' || currentPanel.referencia === '67630-0KF30-C0') && !isProcessing && !validationResult && (
-                  <div style={{ marginTop: '40px', padding: '20px', background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: '8px', textAlign: 'center' }}>
-                    <div style={{ color: '#10b981', fontWeight: 700, fontSize: '18px', marginBottom: '16px' }}>
-                      ESTE PANEL NO LLEVA ORNAMENTO
-                    </div>
-                    <button className="btn btn-primary btn-large" onClick={handleConfirmNoOrnament} style={{ backgroundColor: '#10b981', width: '100%', marginBottom: '16px' }}>
-                      CONFIRMAR PANEL SIN ORNAMENTO
-                    </button>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>O ESCANEA CÓDIGO DE CONTROL:</span>
-                      <Barcode39 value="CMD-NO-ORN" />
-                    </div>
-                  </div>
-                )}
+
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', color: 'var(--text-secondary)' }}>
@@ -919,12 +905,26 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
 
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', color: 'var(--text-secondary)' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '350px', color: 'var(--text-secondary)' }}>
                 {isProcessing ? (
                   <>
                     <RefreshCw className="pulse" size={48} style={{ marginBottom: '16px', color: 'var(--accent-color)' }} />
                     <span>PROCESANDO ANÁLISIS DE BARCODE...</span>
                   </>
+                ) : (currentPanel && (currentPanel.referencia === '67640-0KF40-C0' || currentPanel.referencia === '67630-0KF30-C0')) ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', width: '100%' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#10b981' }}>
+                      <AlertTriangle size={36} className="pulse" />
+                      <strong style={{ fontSize: '20px', fontWeight: 900, letterSpacing: '1px' }}>CÓDIGO NO APLICA</strong>
+                    </div>
+                    <p style={{ fontSize: '13px', margin: '0 0 10px 0', maxWidth: '300px', lineHeight: '1.5', textAlign: 'center' }}>
+                      Este panel se procesa <strong style={{ color: '#10b981' }}>SIN ORNAMENTO</strong>. Escanea el código de control abajo para imprimir Kanban y avanzar.
+                    </p>
+                    <Barcode39 value="CMD-NO-ORN" height={60} />
+                    <button className="btn btn-primary btn-large" onClick={handleConfirmNoOrnament} style={{ backgroundColor: '#10b981', width: '80%', padding: '12px 0', marginTop: '10px' }}>
+                      CONFIRMAR PANEL SIN ORNAMENTO
+                    </button>
+                  </div>
                 ) : (
                   <>
                     <HelpCircle size={48} style={{ marginBottom: '16px', color: '#4b5563' }} />
