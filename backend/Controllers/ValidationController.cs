@@ -84,6 +84,8 @@ namespace Backend.Controllers
         {
             if (request == null) return BadRequest("Datos del escaneo inválidos.");
 
+            Console.WriteLine($"[ValidateScan] ID_OP={request.ID_OrdenProduccion}, ID_OC={request.ID_OrdenCliente}, Orden={request.Orden}, Secuencia={request.Secuencia}, Ref={request.PanelReference}, Puesto={request.Puesto}, Qr={request.Qr}");
+
             var configs = await _dbService.GetConfigsAsync();
             var serverTime = await _dbService.GetServerDateTimeAsync();
 
@@ -266,6 +268,8 @@ namespace Backend.Controllers
         public async Task<IActionResult> ConfirmNoOrnament([FromBody] ConfirmNoOrnamentRequest request)
         {
             if (request == null) return BadRequest("Datos inválidos.");
+
+            Console.WriteLine($"[ConfirmNoOrnament] ID_OP={request.ID_OrdenProduccion}, ID_OC={request.ID_OrdenCliente}, Orden={request.Orden}, Secuencia={request.Secuencia}, Ref={request.PanelReference}, Puesto={request.Puesto}");
 
             var configs = await _dbService.GetConfigsAsync();
             var serverTime = await _dbService.GetServerDateTimeAsync();

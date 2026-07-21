@@ -221,7 +221,7 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
     let active = true;
 
     const fetchNextPanel = async () => {
-      if (isProcessing) return;
+      if (isProcessing || validationResult || footerState === 'error' || footerState === 'rejected') return;
       setIsLoadingPanel(true);
       try {
         const response = await fetch(`${apiBaseUrl}/api/sequence/next?puesto=${puesto}`);
@@ -298,7 +298,7 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
       active = false;
       clearInterval(polling);
     };
-  }, [puesto, refreshIntervalSec, isProcessing]);
+  }, [puesto, refreshIntervalSec, isProcessing, validationResult, footerState]);
 
   // Fetch installed printer status to make sure local printing service is alive
   useEffect(() => {
@@ -406,9 +406,22 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
         method: 'POST',
         headers: requestHeaders,
         body: JSON.stringify({
+          // PascalCase
+          Qr: normalizedQr,
+          PanelReference: currentPanel.referencia,
+          ID_OrdenProduccion: mockDbError ? 0 : currentPanel.iD_OrdenProduccion,
+          ID_OrdenCliente: currentPanel.iD_OrdenCliente,
+          Orden: currentPanel.orden,
+          Secuencia: currentPanel.secuencia,
+          SD: currentPanel.sd,
+          Expr1: currentPanel.expr1,
+          Puesto: puesto,
+          Operador: operador,
+
+          // camelCase
           qr: normalizedQr,
           panelReference: currentPanel.referencia,
-          iD_OrdenProduccion: mockDbError ? 0 : currentPanel.iD_OrdenProduccion, // force invalid ID to fail DB save if mockDbError checked
+          iD_OrdenProduccion: mockDbError ? 0 : currentPanel.iD_OrdenProduccion,
           iD_OrdenCliente: currentPanel.iD_OrdenCliente,
           orden: currentPanel.orden,
           secuencia: currentPanel.secuencia,
@@ -513,6 +526,18 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          // PascalCase
+          PanelReference: currentPanel.referencia,
+          ID_OrdenProduccion: mockDbError ? 0 : currentPanel.iD_OrdenProduccion,
+          ID_OrdenCliente: currentPanel.iD_OrdenCliente,
+          Orden: currentPanel.orden,
+          Secuencia: currentPanel.secuencia,
+          SD: currentPanel.sd,
+          Expr1: currentPanel.expr1,
+          Puesto: puesto,
+          Operador: operador,
+
+          // camelCase
           panelReference: currentPanel.referencia,
           iD_OrdenProduccion: mockDbError ? 0 : currentPanel.iD_OrdenProduccion,
           iD_OrdenCliente: currentPanel.iD_OrdenCliente,
