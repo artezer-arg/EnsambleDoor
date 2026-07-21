@@ -4,6 +4,64 @@ import {
   User, ShieldAlert, Cpu, HelpCircle, Volume2
 } from 'lucide-react';
 
+// Code 39 Barcode Patterns for Offline Rendering
+const CODE39_PATTERNS: Record<string, string> = {
+  '0': 'n n n w w n w n n', '1': 'w n n w n n n n w', '2': 'n n w w n n n n w',
+  '3': 'w n w w n n n n n', '4': 'n n n w w n n n w', '5': 'w n n w w n n n n',
+  '6': 'n n w w w n n n n', '7': 'n n n w n n w n w', '8': 'w n n w n n w n n',
+  '9': 'n n w w n n w n n', 'A': 'w n n n n w n n w', 'B': 'n n w n n w n n w',
+  'C': 'w n w n n w n n n', 'D': 'n n n n w w n n w', 'E': 'w n n n w w n n n',
+  'F': 'n n w n w w n n n', 'G': 'n n n n n w w n w', 'H': 'w n n n n w w n n',
+  'I': 'n n w n n w w n n', 'J': 'n n n n w w w n n', 'K': 'w n n n n n n w w',
+  'L': 'n n w n n n n w w', 'M': 'w n w n n n n w n', 'N': 'n n n n w n n w w',
+  'O': 'w n n n w n n w n', 'P': 'n n w n w n n w n', 'Q': 'n n n n n n w w w',
+  'R': 'w n n n n n w w n', 'S': 'n n w n n n w w n', 'T': 'n n n n w n w w n',
+  'U': 'w w n n n n n n w', 'V': 'n w w n n n n n w', 'W': 'w w w n n n n n n',
+  'X': 'n w n n w n n n w', 'Y': 'w w n n w n n n n', 'Z': 'n w w n w n n n n',
+  '-': 'n w n n n n w n w', '.': 'w w n n n n w n n', ' ': 'n w w n n n w n n',
+  '*': 'n w n n w n w n n', '$': 'n w n w n w n n n', '/': 'n w n w n n n w n',
+  '+': 'n w n n n w n w n', '%': 'n n n w n w n w n'
+};
+
+const Barcode39: React.FC<{ value: string; height?: number }> = ({ value, height = 45 }) => {
+  const formatted = `*${value.toUpperCase()}*`;
+  let x = 15; // Left margin
+  const rects: React.ReactNode[] = [];
+
+  for (let i = 0; i < formatted.length; i++) {
+    const char = formatted[i];
+    const pattern = CODE39_PATTERNS[char];
+    if (!pattern) continue;
+
+    const steps = pattern.split(' ');
+    for (let j = 0; j < steps.length; j++) {
+      const isBar = j % 2 === 0;
+      const isWide = steps[j] === 'w';
+      const width = isWide ? 3 : 1;
+
+      if (isBar) {
+        rects.push(
+          <rect key={`${i}-${j}`} x={x} y={0} width={width} height={height} fill="#000000" />
+        );
+      }
+      x += width;
+    }
+    x += 1; // Narrow space between characters
+  }
+
+  return (
+    <div style={{ background: '#ffffff', padding: '10px 15px', borderRadius: '6px', display: 'inline-block', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}>
+      <svg width={x + 15} height={height} style={{ display: 'block' }}>
+        {rects}
+      </svg>
+      <div style={{ textAlign: 'center', color: '#000000', fontFamily: 'monospace', fontSize: '10px', fontWeight: 700, marginTop: '4px', letterSpacing: '1px' }}>
+        {value}
+      </div>
+    </div>
+  );
+};
+
+
 // Web Audio API Sound Generator (Self-contained, offline-safe)
 const playSound = (type: 'success' | 'error') => {
   try {
@@ -106,6 +164,7 @@ interface OperativeViewProps {
   setMockDbError: (val: boolean) => void;
   mockPrintFolderError: boolean;
   setMockPrintFolderError: (val: boolean) => void;
+  showQrSimulator: boolean;
 }
 
 export const OperativeView: React.FC<OperativeViewProps> = ({
@@ -117,7 +176,8 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
   mockDbError,
   setMockDbError,
   mockPrintFolderError,
-  setMockPrintFolderError
+  setMockPrintFolderError,
+  showQrSimulator
 }) => {
   // Sequence State
   const [currentPanel, setCurrentPanel] = useState<Panel | null>(null);
@@ -144,7 +204,7 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
   const [timeStr, setTimeStr] = useState(new Date().toLocaleTimeString());
 
   // Simulator Drawer State
-  const [simulatorOpen, setSimulatorOpen] = useState(true);
+  const [simulatorOpen, setSimulatorOpen] = useState(false);
   const [simQrInput, setSimQrInput] = useState('');
 
   // Keep ticking clock
@@ -272,7 +332,7 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
 
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [currentPanel, isProcessing]);
+  }, [currentPanel, isProcessing, validationResult]);
 
   // Core scan processing logic
   const handleQrScan = async (qrCode: string) => {
@@ -280,6 +340,28 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
 
     // Normalizing QR
     const normalizedQr = qrCode.trim().replace(/\r?\n|\r/g, "");
+
+    // Intercept control commands scanned via barcode gun
+    const command = normalizedQr.toUpperCase();
+    if (command === 'CMD-NO-ORN') {
+      if ((currentPanel.referencia === '67640-0KF40-C0' || currentPanel.referencia === '67630-0KF30-C0') && !isProcessing && !validationResult) {
+        handleConfirmNoOrnament();
+      }
+      return;
+    }
+    if (command === 'CMD-RETRY') {
+      if (validationResult && validationResult.resultadoGeneral === 'APROBADO' && validationResult.estadoImpresion === 'COMPLETO' && !validationResult.fechaAvancePuntero && !isProcessing) {
+        handleRetryDatabaseAdvance();
+      }
+      return;
+    }
+    if (command === 'CMD-RESET') {
+      if (validationResult && validationResult.resultadoGeneral === 'RECHAZADO') {
+        handleResetForNewScan();
+      }
+      return;
+    }
+
     setLastScannedQr(normalizedQr);
     setShowQrForSeconds(true);
     setTimeout(() => setShowQrForSeconds(false), 5000);
@@ -680,9 +762,13 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
                     <div style={{ color: '#10b981', fontWeight: 700, fontSize: '18px', marginBottom: '16px' }}>
                       ESTE PANEL NO LLEVA ORNAMENTO
                     </div>
-                    <button className="btn btn-primary btn-large" onClick={handleConfirmNoOrnament} style={{ backgroundColor: '#10b981', width: '100%' }}>
+                    <button className="btn btn-primary btn-large" onClick={handleConfirmNoOrnament} style={{ backgroundColor: '#10b981', width: '100%', marginBottom: '16px' }}>
                       CONFIRMAR PANEL SIN ORNAMENTO
                     </button>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>O ESCANEA CÓDIGO DE CONTROL:</span>
+                      <Barcode39 value="CMD-NO-ORN" />
+                    </div>
                   </div>
                 )}
               </div>
@@ -802,24 +888,32 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
 
                 {/* DB pointer advance failure action (Prueba 10 retry) */}
                 {validationResult.resultadoGeneral === 'APROBADO' && validationResult.estadoImpresion === 'COMPLETO' && !validationResult.fechaAvancePuntero && (
-                  <div style={{ marginTop: '20px', padding: '16px', background: 'rgba(234, 88, 12, 0.08)', border: '1px solid rgba(234, 88, 12, 0.3)', borderRadius: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#ea580c', fontWeight: 700, marginBottom: '8px' }}>
-                      <AlertTriangle size={20} />
+                  <div style={{ marginTop: '20px', padding: '16px', background: 'rgba(234, 88, 12, 0.08)', border: '1px solid rgba(234, 88, 12, 0.3)', borderRadius: '8px', textAlign: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#ea580c', fontWeight: 700, marginBottom: '8px', textAlign: 'left' }}>
+                      <AlertTriangle size={20} style={{ flexShrink: 0 }} />
                       <span>FALLÓ AVANCE DE TRANSACCIÓN EN SQL SERVER</span>
                     </div>
-                    <p style={{ fontSize: '12px', margin: '0 0 12px 0' }}>El Kanban fue impreso, pero el puntero del puesto no pudo actualizarse. Pulse reintentar para completar el avance sin imprimir otra etiqueta.</p>
-                    <button className="btn btn-primary" onClick={handleRetryDatabaseAdvance} style={{ backgroundColor: '#ea580c', width: '100%' }}>
+                    <p style={{ fontSize: '12px', margin: '0 0 12px 0', textAlign: 'left', color: 'var(--text-secondary)' }}>El Kanban fue impreso, pero el puntero no pudo actualizarse. Escanea o presiona reintentar para avanzar la secuencia.</p>
+                    <button className="btn btn-primary" onClick={handleRetryDatabaseAdvance} style={{ backgroundColor: '#ea580c', width: '100%', marginBottom: '16px' }}>
                       REINTENTAR ACTUALIZAR BASE DE DATOS
                     </button>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>O ESCANEA CÓDIGO DE CONTROL:</span>
+                      <Barcode39 value="CMD-RETRY" />
+                    </div>
                   </div>
                 )}
 
                 {/* Reset button for rejected scan */}
                 {validationResult.resultadoGeneral === 'RECHAZADO' && (
-                  <div style={{ marginTop: '24px' }}>
-                    <button className="btn btn-secondary" onClick={handleResetForNewScan} style={{ width: '100%', padding: '16px' }}>
+                  <div style={{ marginTop: '24px', textAlign: 'center' }}>
+                    <button className="btn btn-secondary" onClick={handleResetForNewScan} style={{ width: '100%', padding: '16px', marginBottom: '16px' }}>
                       ACEPTAR Y LEER OTRO ORNAMENTO
                     </button>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>O ESCANEA CÓDIGO DE CONTROL:</span>
+                      <Barcode39 value="CMD-RESET" />
+                    </div>
                   </div>
                 )}
 
@@ -879,119 +973,121 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
       </footer>
 
       {/* SIMULATOR SLIDEOUT (For developer testing) */}
-      <div className="card-panel" style={{
-        position: 'absolute',
-        top: simulatorOpen ? '100px' : 'calc(100vh - 50px)',
-        right: '24px',
-        width: '320px',
-        zIndex: 100,
-        backgroundColor: '#111827',
-        border: '2px solid var(--accent-color)',
-        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.7)',
-        padding: '16px',
-        borderRadius: '8px',
-        transition: 'top 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-          <strong style={{ color: 'var(--accent-color)', fontSize: '13px', letterSpacing: '1px' }}>🖥️ MODO SIMULADOR QR</strong>
-          <button className="btn btn-secondary" onClick={() => setSimulatorOpen(!simulatorOpen)} style={{ padding: '4px 8px', fontSize: '11px' }}>
-            {simulatorOpen ? 'OCULTAR' : 'MOSTRAR'}
-          </button>
-        </div>
-
-        {simulatorOpen && (
-          <div>
-            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: '0 0 12px 0' }}>
-              Pegue o simule lecturas de códigos QR aquí. El formato por defecto del seed es:
-              <br/><code style={{ background: '#222', color: '#10b981', display: 'block', padding: '4px', margin: '4px 0', borderRadius: '3px' }}>CÓDIGO_ORNAMENTO;FECHA_CURADO;SERIAL</code>
-            </p>
-
-            <div style={{ marginBottom: '12px' }}>
-              <label style={{ fontSize: '11px', display: 'block', marginBottom: '4px' }}>Pegar código QR de prueba:</label>
-              <textarea 
-                className="form-input" 
-                rows={2} 
-                value={simQrInput}
-                onChange={(e) => setSimQrInput(e.target.value)}
-                placeholder="67781-0K090;202607170600;SN998822"
-                style={{ fontSize: '12px', fontFamily: 'monospace' }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-              <button 
-                className="btn btn-primary" 
-                onClick={() => { if(simQrInput) handleQrScan(simQrInput); }} 
-                disabled={!currentPanel || isProcessing}
-                style={{ flex: 1, fontSize: '12px', padding: '8px 12px' }}
-              >
-                Disparar Escaneo
-              </button>
-              <button 
-                className="btn btn-secondary" 
-                onClick={() => setSimQrInput('')} 
-                style={{ fontSize: '12px', padding: '8px' }}
-              >
-                Borrar
-              </button>
-            </div>
-
-            <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '10px' }}>
-              <strong style={{ fontSize: '11px', display: 'block', marginBottom: '6px', color: '#ea580c' }}>Simular errores de Planta:</strong>
-              
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                <input 
-                  type="checkbox" 
-                  id="chkPrintErr" 
-                  checked={mockPrintFolderError} 
-                  onChange={(e) => setMockPrintFolderError(e.target.checked)} 
-                />
-                <label htmlFor="chkPrintErr" style={{ fontSize: '11px', cursor: 'pointer' }}>Error de Impresora (Prueba 9)</label>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <input 
-                  type="checkbox" 
-                  id="chkDbErr" 
-                  checked={mockDbError} 
-                  onChange={(e) => setMockDbError(e.target.checked)} 
-                />
-                <label htmlFor="chkDbErr" style={{ fontSize: '11px', cursor: 'pointer' }}>Fallo de Base de Datos (Prueba 10)</label>
-              </div>
-            </div>
-            
-            {/* Quick Helper seeds list */}
-            {currentPanel && (
-              <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '10px', marginTop: '10px' }}>
-                <strong style={{ fontSize: '10px', display: 'block', marginBottom: '4px', color: 'var(--text-secondary)' }}>QR válidos según el panel solicitado:</strong>
-                
-                {currentPanel.referencia === '67610-0KM60-C0' && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <button className="btn btn-secondary" style={{ fontSize: '10px', padding: '4px', justifyContent: 'flex-start' }} onClick={() => setSimQrInput("67781-0K090;202607170600;SN123456")}>
-                      ✔️ OK (Curado 4h 10m - Prueba 1)
-                    </button>
-                    <button className="btn btn-secondary" style={{ fontSize: '10px', padding: '4px', justifyContent: 'flex-start' }} onClick={() => setSimQrInput("67782-0K090;202607170600;SN123456")}>
-                      ❌ ERROR (Ornamento incorrecto - Prueba 2)
-                    </button>
-                  </div>
-                )}
-
-                {currentPanel.referencia === '67610-0KM70-C0' && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <button className="btn btn-secondary" style={{ fontSize: '10px', padding: '4px', justifyContent: 'flex-start' }} onClick={() => setSimQrInput("67781-0K100;202607170611;SN123456")}>
-                      ❌ CURADO INSUFICIENTE (3h 59m - Prueba 3)
-                    </button>
-                    <button className="btn btn-secondary" style={{ fontSize: '10px', padding: '4px', justifyContent: 'flex-start' }} onClick={() => setSimQrInput("67781-0K100;202607170610;SN123456")}>
-                      ✔️ CURADO OK (4h 00m - Prueba 4)
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-
+      {showQrSimulator && (
+        <div className="card-panel" style={{
+          position: 'absolute',
+          top: simulatorOpen ? '100px' : 'calc(100vh - 50px)',
+          right: '24px',
+          width: '320px',
+          zIndex: 100,
+          backgroundColor: '#111827',
+          border: '2px solid var(--accent-color)',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.7)',
+          padding: '16px',
+          borderRadius: '8px',
+          transition: 'top 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <strong style={{ color: 'var(--accent-color)', fontSize: '13px', letterSpacing: '1px' }}>🖥️ MODO SIMULADOR QR</strong>
+            <button className="btn btn-secondary" onClick={() => setSimulatorOpen(!simulatorOpen)} style={{ padding: '4px 8px', fontSize: '11px' }}>
+              {simulatorOpen ? 'OCULTAR' : 'MOSTRAR'}
+            </button>
           </div>
-        )}
-      </div>
+
+          {simulatorOpen && (
+            <div>
+              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: '0 0 12px 0' }}>
+                Pegue o simule lecturas de códigos QR aquí. El formato por defecto del seed es:
+                <br/><code style={{ background: '#222', color: '#10b981', display: 'block', padding: '4px', margin: '4px 0', borderRadius: '3px' }}>CÓDIGO_ORNAMENTO;FECHA_CURADO;SERIAL</code>
+              </p>
+
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ fontSize: '11px', display: 'block', marginBottom: '4px' }}>Pegar código QR de prueba:</label>
+                <textarea 
+                  className="form-input" 
+                  rows={2} 
+                  value={simQrInput}
+                  onChange={(e) => setSimQrInput(e.target.value)}
+                  placeholder="67781-0K090;202607170600;SN998822"
+                  style={{ fontSize: '12px', fontFamily: 'monospace' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                <button 
+                  className="btn btn-primary" 
+                  onClick={() => { if(simQrInput) handleQrScan(simQrInput); }} 
+                  disabled={!currentPanel || isProcessing}
+                  style={{ flex: 1, fontSize: '12px', padding: '8px 12px' }}
+                >
+                  Disparar Escaneo
+                </button>
+                <button 
+                  className="btn btn-secondary" 
+                  onClick={() => setSimQrInput('')} 
+                  style={{ fontSize: '12px', padding: '8px' }}
+                >
+                  Borrar
+                </button>
+              </div>
+
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '10px' }}>
+                <strong style={{ fontSize: '11px', display: 'block', marginBottom: '6px', color: '#ea580c' }}>Simular errores de Planta:</strong>
+                
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                  <input 
+                    type="checkbox" 
+                    id="chkPrintErr" 
+                    checked={mockPrintFolderError} 
+                    onChange={(e) => setMockPrintFolderError(e.target.checked)} 
+                  />
+                  <label htmlFor="chkPrintErr" style={{ fontSize: '11px', cursor: 'pointer' }}>Error de Impresora (Prueba 9)</label>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <input 
+                    type="checkbox" 
+                    id="chkDbErr" 
+                    checked={mockDbError} 
+                    onChange={(e) => setMockDbError(e.target.checked)} 
+                  />
+                  <label htmlFor="chkDbErr" style={{ fontSize: '11px', cursor: 'pointer' }}>Fallo de Base de Datos (Prueba 10)</label>
+                </div>
+              </div>
+              
+              {/* Quick Helper seeds list */}
+              {currentPanel && (
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '10px', marginTop: '10px' }}>
+                  <strong style={{ fontSize: '10px', display: 'block', marginBottom: '4px', color: 'var(--text-secondary)' }}>QR válidos según el panel solicitado:</strong>
+                  
+                  {currentPanel.referencia === '67610-0KM60-C0' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <button className="btn btn-secondary" style={{ fontSize: '10px', padding: '4px', justifyContent: 'flex-start' }} onClick={() => setSimQrInput("67781-0K090;202607170600;SN123456")}>
+                        ✔️ OK (Curado 4h 10m - Prueba 1)
+                      </button>
+                      <button className="btn btn-secondary" style={{ fontSize: '10px', padding: '4px', justifyContent: 'flex-start' }} onClick={() => setSimQrInput("67782-0K090;202607170600;SN123456")}>
+                        ❌ ERROR (Ornamento incorrecto - Prueba 2)
+                      </button>
+                    </div>
+                  )}
+
+                  {currentPanel.referencia === '67610-0KM70-C0' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <button className="btn btn-secondary" style={{ fontSize: '10px', padding: '4px', justifyContent: 'flex-start' }} onClick={() => setSimQrInput("67781-0K100;202607170611;SN123456")}>
+                        ❌ CURADO INSUFICIENTE (3h 59m - Prueba 3)
+                      </button>
+                      <button className="btn btn-secondary" style={{ fontSize: '10px', padding: '4px', justifyContent: 'flex-start' }} onClick={() => setSimQrInput("67781-0K100;202607170610;SN123456")}>
+                        ✔️ CURADO OK (4h 00m - Prueba 4)
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+            </div>
+          )}
+        </div>
+      )}
 
     </div>
   );

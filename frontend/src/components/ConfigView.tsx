@@ -55,6 +55,7 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ apiBaseUrl, onClose, onC
   const [printerZplTemplate, setPrinterZplTemplate] = useState('');
   const [printerList, setPrinterList] = useState<string[]>([]);
   const [simulatorEnabled, setSimulatorEnabled] = useState(false);
+  const [showQrSimulator, setShowQrSimulator] = useState(false);
   const [qrParseType, setQrParseType] = useState('Separator');
   const [qrSeparator, setQrSeparator] = useState(';');
   const [qrPosOrnIdx, setQrPosOrnIdx] = useState('0');
@@ -161,6 +162,7 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ apiBaseUrl, onClose, onC
         setPrinterPort(data.Printer_Port || '9100');
         setPrinterZplTemplate(data.Printer_Zpl_Template || '');
         setSimulatorEnabled(data.Printer_Simulator_Enabled === 'true');
+        setShowQrSimulator(data.Show_QR_Simulator === 'true');
         setQrParseType(data.Qr_Parse_Type || 'Separator');
         setQrSeparator(data.Qr_Separator || ';');
         setQrPosOrnIdx(data.Qr_Pos_Ornament_Index || '0');
@@ -252,6 +254,7 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ apiBaseUrl, onClose, onC
     success = success && await handleSaveConfig('Min_Curing_Hours', minCuringHours, 'Cambio límite horas de curado');
     success = success && await handleSaveConfig('Printer_Name', printerName, 'Configuración de impresora');
     success = success && await handleSaveConfig('Printer_Simulator_Enabled', simulatorEnabled ? 'true' : 'false', 'Configuración de simulador de impresión');
+    success = success && await handleSaveConfig('Show_QR_Simulator', showQrSimulator ? 'true' : 'false', 'Configuración visualización simulador QR');
     success = success && await handleSaveConfig('Printer_Mode', printerMode, 'Configuración de modo de conexión de impresora');
     success = success && await handleSaveConfig('Printer_IP', printerIp, 'Configuración de dirección IP de impresora');
     success = success && await handleSaveConfig('Printer_Port', printerPort, 'Configuración de puerto TCP de impresora');
@@ -647,6 +650,18 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ apiBaseUrl, onClose, onC
                 />
                 <label htmlFor="simulatorCheck" style={{ margin: 0, color: '#f59e0b', cursor: 'pointer', fontWeight: 600 }}>
                   Activar Simulador de Impresión Virtual (Guarda archivos PNG locales en PrintedLabels en vez de imprimir)
+                </label>
+              </div>
+              <div className="form-group" style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px' }}>
+                <input 
+                  type="checkbox" 
+                  id="showQrSimulatorCheck" 
+                  checked={showQrSimulator} 
+                  onChange={(e) => setShowQrSimulator(e.target.checked)} 
+                  style={{ width: '18px', height: '18px' }} 
+                />
+                <label htmlFor="showQrSimulatorCheck" style={{ margin: 0, color: 'var(--accent-color)', cursor: 'pointer', fontWeight: 600 }}>
+                  Mostrar Panel de Simulación QR en la pantalla operativa de Planta (Demo)
                 </label>
               </div>
             </div>

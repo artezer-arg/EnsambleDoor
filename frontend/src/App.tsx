@@ -31,6 +31,7 @@ function App() {
   // Simulator configurations
   const [mockDbError, setMockDbError] = useState(false);
   const [mockPrintFolderError, setMockPrintFolderError] = useState(false);
+  const [showQrSimulator, setShowQrSimulator] = useState(false);
 
   // Sync state to LocalStorage
   useEffect(() => {
@@ -59,6 +60,9 @@ function App() {
           const sec = parseInt(data.Refresh_Interval_Sec, 10);
           setRefreshIntervalSec(sec);
           localStorage.setItem('refresh_interval', sec.toString());
+        }
+        if (data.Show_QR_Simulator) {
+          setShowQrSimulator(data.Show_QR_Simulator === 'true');
         }
       }
     } catch (e) {
@@ -211,6 +215,7 @@ function App() {
             setMockDbError={setMockDbError}
             mockPrintFolderError={mockPrintFolderError}
             setMockPrintFolderError={setMockPrintFolderError}
+            showQrSimulator={showQrSimulator}
           />
         )}
 

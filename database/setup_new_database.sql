@@ -387,8 +387,12 @@ IF NOT EXISTS (SELECT 1 FROM dbo.Configuracion_Sistema WHERE Clave = 'Printer_Zp
 GO
 
 -- Inserción de equivalencias estándar por defecto
+IF NOT EXISTS (SELECT 1 FROM dbo.Configuracion_Sistema WHERE Clave = 'Show_QR_Simulator')
+    INSERT INTO dbo.Configuracion_Sistema (Clave, Valor, Descripcion) VALUES ('Show_QR_Simulator', 'false', 'Mostrar panel simulador QR en pantalla principal');
+
 IF NOT EXISTS (SELECT 1 FROM dbo.Equivalencia_Panel_Ornamento WHERE CodigoPanel = '67610-0KM60-C0')
     INSERT INTO dbo.Equivalencia_Panel_Ornamento (CodigoPanel, CodigoOrnamento, RequiereOrnamento) VALUES ('67610-0KM60-C0', '67781-0K090', 1);
+
 
 IF NOT EXISTS (SELECT 1 FROM dbo.Equivalencia_Panel_Ornamento WHERE CodigoPanel = '67620-0KM60-C0')
     INSERT INTO dbo.Equivalencia_Panel_Ornamento (CodigoPanel, CodigoOrnamento, RequiereOrnamento) VALUES ('67620-0KM60-C0', '67782-0K090', 1);
