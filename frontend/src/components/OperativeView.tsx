@@ -57,6 +57,8 @@ interface Panel {
   expr1: string;
   puesto: string;
   fechaSecuencia?: string;
+  mano?: string;
+  posicion?: string;
 }
 
 interface ValidationResult {
@@ -653,18 +655,22 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
                 </div>
 
                 {/* 3. Datos Auxiliares Menores */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', background: 'rgba(255,255,255,0.01)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '8px', background: 'rgba(255,255,255,0.01)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)' }}>
                   <div>
                     <span style={{ fontSize: '10px', color: 'var(--text-secondary)', display: 'block' }}>ORDEN COLA:</span>
-                    <strong style={{ fontSize: '15px', color: '#ffffff' }}>{currentPanel.orden}</strong>
+                    <strong style={{ fontSize: '14px', color: '#ffffff' }}>{currentPanel.orden}</strong>
                   </div>
                   <div>
                     <span style={{ fontSize: '10px', color: 'var(--text-secondary)', display: 'block' }}>OP ID:</span>
-                    <strong style={{ fontSize: '15px', color: '#ffffff' }}>{currentPanel.iD_OrdenProduccion}</strong>
+                    <strong style={{ fontSize: '14px', color: '#ffffff' }}>{currentPanel.iD_OrdenProduccion}</strong>
                   </div>
                   <div>
-                    <span style={{ fontSize: '10px', color: 'var(--text-secondary)', display: 'block' }}>MANO/POS:</span>
-                    <strong style={{ fontSize: '15px', color: '#a855f7' }}>{currentPanel.expr1 || 'N/A'}</strong>
+                    <span style={{ fontSize: '10px', color: 'var(--text-secondary)', display: 'block' }}>POSICIÓN:</span>
+                    <strong style={{ fontSize: '14px', color: '#a855f7' }}>{currentPanel.posicion || 'N/A'}</strong>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '10px', color: 'var(--text-secondary)', display: 'block' }}>MANO:</span>
+                    <strong style={{ fontSize: '14px', color: '#ec4899' }}>{currentPanel.mano || 'N/A'}</strong>
                   </div>
                 </div>
 

@@ -193,7 +193,9 @@ BEGIN
             OP.Puesto,
             OP.Orden,
             OP.Estado,
-            OP.Posicion + OP.Mano AS Expr1
+            OP.Posicion + OP.Mano AS Expr1,
+            OP.Mano,
+            OP.Posicion
         FROM dbo.Orden_Produccion AS OP
         INNER JOIN dbo.Puesto AS P
             ON OP.Lector = P.Lector
@@ -213,7 +215,9 @@ BEGIN
         SD,
         Expr1,
         Puesto,
-        Fecha_Secuencia AS FechaSecuencia
+        Fecha_Secuencia AS FechaSecuencia,
+        Mano,
+        Posicion
     FROM Consulta_Principal;
 END;
 GO

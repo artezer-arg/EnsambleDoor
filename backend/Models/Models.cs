@@ -13,6 +13,8 @@ namespace Backend.Models
         public string Expr1 { get; set; } = string.Empty;
         public string Puesto { get; set; } = string.Empty;
         public DateTime? FechaSecuencia { get; set; }
+        public string Mano { get; set; } = string.Empty;
+        public string Posicion { get; set; } = string.Empty;
     }
 
     public class Equivalencia
