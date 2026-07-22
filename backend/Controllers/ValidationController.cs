@@ -285,7 +285,7 @@ namespace Backend.Controllers
                 Puesto = request.Puesto,
                 Operador = request.Operador,
                 FechaActualServidor = serverTime,
-                QrCompleto = "SIN_ORNAMENTO",
+                QrCompleto = $"SIN_ORNAMENTO_OP_{request.ID_OrdenProduccion}_SEC_{request.Secuencia}_{Guid.NewGuid().ToString().Substring(0, 8)}",
                 ResultadoGeneral = "APROBADO",
                 ResultadoCorrespondencia = "N/A",
                 ResultadoCurado = "N/A",
