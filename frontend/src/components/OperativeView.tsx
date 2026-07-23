@@ -714,116 +714,199 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
       <main style={{ display: 'flex', flex: 1, gap: '16px', padding: '8px 16px', overflow: 'hidden' }}>
         
         {/* LEFT PANEL: Requested Panel Sequence */}
-        <section className="card-panel" style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', borderRight: '1px solid var(--border-color)' }}>
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', marginBottom: '16px' }}>
-              <h2 style={{ margin: 0, fontSize: '14px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>Panel Solicitado</h2>
-              <span style={{ background: 'rgba(59, 130, 246, 0.1)', color: 'var(--accent-color)', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 700 }}>
-                SECUENCIA ACTIVA
-              </span>
-            </div>
+        <section className="card-panel" style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '16px', boxSizing: 'border-box', height: '100%', overflow: 'hidden' }}>
+          
+          {/* Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', flexShrink: 0 }}>
+            <h2 style={{ margin: 0, fontSize: '14px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>Panel Solicitado</h2>
+            <span style={{ background: 'rgba(59, 130, 246, 0.1)', color: 'var(--accent-color)', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 700 }}>
+              SECUENCIA ACTIVA
+            </span>
+          </div>
 
-            {currentPanel ? (
-              <div className="slide-up">
-                {/* 1. Código de Panel */}
-                <div style={{ marginBottom: '20px', borderBottom: '1px dashed rgba(255,255,255,0.06)', paddingBottom: '12px' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    Código Panel de Planta
+          {currentPanel ? (
+            <div className="slide-up" style={{ flex: 1, display: 'grid', gridTemplateRows: '2.5fr 1.8fr 1.2fr 1.2fr', gap: '12px', marginTop: '12px', marginBottom: '12px', minHeight: 0 }}>
+              
+              {/* Row 1: Secuencia and SD */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', minHeight: 0 }}>
+                {/* Secuencia Card */}
+                <div style={{ 
+                  background: 'rgba(255,255,255,0.02)', 
+                  padding: '14px 18px', 
+                  borderRadius: '12px', 
+                  border: '1px solid rgba(255,255,255,0.06)', 
+                  borderLeft: '4px solid var(--accent-color)',
+                  boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.2)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  minHeight: 0
+                }}>
+                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px' }}>
+                    Secuencia
                   </span>
-                  <strong style={{ fontSize: '26px', fontWeight: 800, color: '#ffffff', letterSpacing: '0.5px' }}>
-                    {currentPanel.referencia}
-                  </strong>
-                </div>
-
-                {/* 2. GRANDES (SD, Secuencia, Fecha) */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '20px' }}>
-                  
-                  {/* Fila superior: SD y Secuencia al lado */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                    {/* SD en grande */}
-                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.2)' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px', marginBottom: '4px' }}>
-                        SD (Modelo)
-                      </span>
-                      <strong style={{ fontSize: '42px', fontWeight: 900, color: '#10b981', display: 'block', lineHeight: 1 }}>
-                        {currentPanel.sd || 'N/A'}
-                      </strong>
-                    </div>
-
-                    {/* Secuencia en grande */}
-                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.2)' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px', marginBottom: '4px' }}>
-                        Nro. Secuencia
-                      </span>
-                      <strong style={{ fontSize: '42px', fontWeight: 900, color: 'var(--accent-color)', display: 'block', lineHeight: 1 }}>
-                        {currentPanel.secuencia}
-                      </strong>
-                    </div>
-                  </div>
-
-                  {/* Fila: Fecha Secuencia en grande */}
-                  <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.2)' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px', marginBottom: '4px' }}>
-                      Fecha de Secuencia
-                    </span>
-                    <strong style={{ fontSize: '28px', fontWeight: 800, color: '#f59e0b', display: 'block', lineHeight: 1.1 }}>
-                      {currentPanel.fechaSecuencia 
-                        ? new Date(currentPanel.fechaSecuencia).toLocaleString('es-AR', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })
-                        : 'N/A'}
+                  <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                    <strong style={{ fontSize: 'clamp(44px, 6vh, 76px)', fontWeight: 900, color: 'var(--accent-color)', lineHeight: 1 }}>
+                      {currentPanel.secuencia}
                     </strong>
                   </div>
                 </div>
 
-                {/* 3. Datos Auxiliares Menores */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '8px', background: 'rgba(255,255,255,0.01)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)' }}>
-                  <div>
-                    <span style={{ fontSize: '10px', color: 'var(--text-secondary)', display: 'block' }}>ORDEN COLA:</span>
-                    <strong style={{ fontSize: '14px', color: '#ffffff' }}>{currentPanel.orden}</strong>
+                {/* SD Card */}
+                <div style={{ 
+                  background: 'rgba(255,255,255,0.02)', 
+                  padding: '14px 18px', 
+                  borderRadius: '12px', 
+                  border: '1px solid rgba(255,255,255,0.06)', 
+                  borderLeft: '4px solid #10b981',
+                  boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.2)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  minHeight: 0
+                }}>
+                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px' }}>
+                    SD
+                  </span>
+                  <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                    <strong style={{ fontSize: 'clamp(44px, 6vh, 76px)', fontWeight: 900, color: '#10b981', lineHeight: 1 }}>
+                      {currentPanel.sd || 'N/A'}
+                    </strong>
                   </div>
-                  <div>
-                    <span style={{ fontSize: '10px', color: 'var(--text-secondary)', display: 'block' }}>OP ID:</span>
-                    <strong style={{ fontSize: '14px', color: '#ffffff' }}>{currentPanel.iD_OrdenProduccion}</strong>
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '10px', color: 'var(--text-secondary)', display: 'block' }}>POSICIÓN:</span>
-                    <strong style={{ fontSize: '14px', color: '#a855f7' }}>{currentPanel.posicion || 'N/A'}</strong>
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '10px', color: 'var(--text-secondary)', display: 'block' }}>MANO:</span>
-                    <strong style={{ fontSize: '14px', color: '#ec4899' }}>{currentPanel.mano || 'N/A'}</strong>
+                </div>
+              </div>
+
+              {/* Row 2: Posicion and Mano */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', minHeight: 0 }}>
+                {/* Posicion Card */}
+                <div style={{ 
+                  background: 'rgba(255,255,255,0.02)', 
+                  padding: '10px 18px', 
+                  borderRadius: '12px', 
+                  border: '1px solid rgba(255,255,255,0.06)', 
+                  borderLeft: '4px solid #a855f7',
+                  boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.2)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  minHeight: 0
+                }}>
+                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px' }}>
+                    Posicion
+                  </span>
+                  <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                    <strong style={{ fontSize: 'clamp(30px, 3.8vh, 48px)', fontWeight: 900, color: '#a855f7', lineHeight: 1 }}>
+                      {currentPanel.posicion || 'N/A'}
+                    </strong>
                   </div>
                 </div>
 
+                {/* Mano Card */}
+                <div style={{ 
+                  background: 'rgba(255,255,255,0.02)', 
+                  padding: '10px 18px', 
+                  borderRadius: '12px', 
+                  border: '1px solid rgba(255,255,255,0.06)', 
+                  borderLeft: '4px solid #ec4899',
+                  boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.2)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  minHeight: 0
+                }}>
+                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px' }}>
+                    Mano
+                  </span>
+                  <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                    <strong style={{ fontSize: 'clamp(30px, 3.8vh, 48px)', fontWeight: 900, color: '#ec4899', lineHeight: 1 }}>
+                      {currentPanel.mano || 'N/A'}
+                    </strong>
+                  </div>
+                </div>
+              </div>
 
+              {/* Row 3: Fecha (Full width) */}
+              <div style={{ 
+                background: 'rgba(255,255,255,0.02)', 
+                padding: '10px 18px', 
+                borderRadius: '12px', 
+                border: '1px solid rgba(255,255,255,0.06)', 
+                borderLeft: '4px solid #f59e0b',
+                boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.2)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                minHeight: 0
+              }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px' }}>
+                  Fecha
+                </span>
+                <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'flex-start' }}>
+                  <strong style={{ fontSize: 'clamp(18px, 2.2vh, 26px)', fontWeight: 800, color: '#f59e0b', lineHeight: 1.1 }}>
+                    {currentPanel.fechaSecuencia 
+                      ? new Date(currentPanel.fechaSecuencia).toLocaleString('es-AR', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit'
+                        })
+                      : 'N/A'}
+                  </strong>
+                </div>
               </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', color: 'var(--text-secondary)' }}>
-                {isLoadingPanel ? (
-                  <>
-                    <RefreshCw className="pulse" size={48} style={{ marginBottom: '16px', color: 'var(--accent-color)' }} />
-                    <span>CONSULTANDO SECUENCIA SQL...</span>
-                  </>
-                ) : (
-                  <>
-                    <ShieldAlert size={48} style={{ marginBottom: '16px', color: '#6b7280' }} />
-                    <span style={{ fontSize: '18px', fontWeight: 700, textAlign: 'center' }}>
-                      {noPanelsMessage || "SIN PANELES PENDIENTES"}
-                    </span>
-                  </>
-                )}
+
+              {/* Row 4: Código (Full width) */}
+              <div style={{ 
+                background: 'rgba(255,255,255,0.02)', 
+                padding: '10px 18px', 
+                borderRadius: '12px', 
+                border: '1px solid rgba(255,255,255,0.06)', 
+                borderLeft: '4px solid #6b7280',
+                boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.2)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                minHeight: 0
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px' }}>
+                    Codigo
+                  </span>
+                  <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>
+                    OP: {currentPanel.iD_OrdenProduccion} | Cola: {currentPanel.orden}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'flex-start' }}>
+                  <strong style={{ fontSize: 'clamp(18px, 2.5vh, 28px)', fontWeight: 800, color: '#ffffff', lineHeight: 1.1, fontFamily: 'monospace', letterSpacing: '0.5px' }}>
+                    {currentPanel.referencia}
+                  </strong>
+                </div>
               </div>
-            )}
-          </div>
+
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flex: 1, flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}>
+              {isLoadingPanel ? (
+                <>
+                  <RefreshCw className="pulse" size={48} style={{ marginBottom: '16px', color: 'var(--accent-color)' }} />
+                  <span>CONSULTANDO SECUENCIA SQL...</span>
+                </>
+              ) : (
+                <>
+                  <ShieldAlert size={48} style={{ marginBottom: '16px', color: '#6b7280' }} />
+                  <span style={{ fontSize: '18px', fontWeight: 700, textAlign: 'center' }}>
+                    {noPanelsMessage || "SIN PANELES PENDIENTES"}
+                  </span>
+                </>
+              )}
+            </div>
+          )}
 
           {/* Quick Scanner Listening Indicator */}
           {currentPanel && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px', fontSize: '13px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px', fontSize: '13px', flexShrink: 0 }}>
               <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: scannerActive ? '#10b981' : '#6b7280', animation: scannerActive ? 'pulse 1.5s infinite' : 'none' }}></span>
               <span style={{ color: 'var(--text-secondary)' }}>
                 {isProcessing ? 'Lector Bloqueado mientras se procesa...' : 'Lector QR Activo (Espere disparo de pistola USB)'}
