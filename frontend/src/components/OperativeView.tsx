@@ -1,60 +1,17 @@
 import React, { useState, useEffect } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import { 
   Database, Printer, CheckCircle, XCircle, AlertTriangle, RefreshCw, 
   User, ShieldAlert, Cpu, HelpCircle, Volume2
 } from 'lucide-react';
 
-// Code 39 Barcode Patterns for Offline Rendering
-const CODE39_PATTERNS: Record<string, string> = {
-  '0': 'n n n w w n w n n', '1': 'w n n w n n n n w', '2': 'n n w w n n n n w',
-  '3': 'w n w w n n n n n', '4': 'n n n w w n n n w', '5': 'w n n w w n n n n',
-  '6': 'n n w w w n n n n', '7': 'n n n w n n w n w', '8': 'w n n w n n w n n',
-  '9': 'n n w w n n w n n', 'A': 'w n n n n w n n w', 'B': 'n n w n n w n n w',
-  'C': 'w n w n n w n n n', 'D': 'n n n n w w n n w', 'E': 'w n n n w w n n n',
-  'F': 'n n w n w w n n n', 'G': 'n n n n n w w n w', 'H': 'w n n n n w w n n',
-  'I': 'n n w n n w w n n', 'J': 'n n n n w w w n n', 'K': 'w n n n n n n w w',
-  'L': 'n n w n n n n w w', 'M': 'w n w n n n n w n', 'N': 'n n n n w n n w w',
-  'O': 'w n n n w n n w n', 'P': 'n n w n w n n w n', 'Q': 'n n n n n n w w w',
-  'R': 'w n n n n n w w n', 'S': 'n n w n n n w w n', 'T': 'n n n n w n w w n',
-  'U': 'w w n n n n n n w', 'V': 'n w w n n n n n w', 'W': 'w w w n n n n n n',
-  'X': 'n w n n w n n n w', 'Y': 'w w n n w n n n n', 'Z': 'n w w n w n n n n',
-  '-': 'n w n n n n w n w', '.': 'w w n n n n w n n', ' ': 'n w w n n n w n n',
-  '*': 'n w n n w n w n n', '$': 'n w n w n w n n n', '/': 'n w n w n n n w n',
-  '+': 'n w n n n w n w n', '%': 'n n n w n w n w n'
-};
 
-const Barcode39: React.FC<{ value: string; height?: number }> = ({ value, height = 45 }) => {
-  const formatted = `*${value.toUpperCase()}*`;
-  let x = 15; // Left margin
-  const rects: React.ReactNode[] = [];
 
-  for (let i = 0; i < formatted.length; i++) {
-    const char = formatted[i];
-    const pattern = CODE39_PATTERNS[char];
-    if (!pattern) continue;
-
-    const steps = pattern.split(' ');
-    for (let j = 0; j < steps.length; j++) {
-      const isBar = j % 2 === 0;
-      const isWide = steps[j] === 'w';
-      const width = isWide ? 3 : 1;
-
-      if (isBar) {
-        rects.push(
-          <rect key={`${i}-${j}`} x={x} y={0} width={width} height={height} fill="#000000" />
-        );
-      }
-      x += width;
-    }
-    x += 1; // Narrow space between characters
-  }
-
+const ControlQRCode: React.FC<{ value: string; size?: number }> = ({ value, size = 160 }) => {
   return (
-    <div style={{ background: '#ffffff', padding: '10px 15px', borderRadius: '6px', display: 'inline-block', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}>
-      <svg width={x + 15} height={height} style={{ display: 'block' }}>
-        {rects}
-      </svg>
-      <div style={{ textAlign: 'center', color: '#000000', fontFamily: 'monospace', fontSize: '10px', fontWeight: 700, marginTop: '4px', letterSpacing: '1px' }}>
+    <div style={{ background: '#ffffff', padding: '12px', borderRadius: '8px', display: 'inline-block', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}>
+      <QRCodeSVG value={value} size={size} level="H" includeMargin={true} />
+      <div style={{ textAlign: 'center', color: '#000000', fontFamily: 'monospace', fontSize: '12px', fontWeight: 700, marginTop: '6px', letterSpacing: '1px' }}>
         {value}
       </div>
     </div>
@@ -825,64 +782,92 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
                 </div>
               </div>
 
-              {/* Row 3: Fecha (Full width) */}
-              <div style={{ 
-                background: 'rgba(255,255,255,0.02)', 
-                padding: '10px 18px', 
-                borderRadius: '12px', 
-                border: '1px solid rgba(255,255,255,0.06)', 
-                borderLeft: '4px solid #f59e0b',
-                boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.2)',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                minHeight: 0
-              }}>
-                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px' }}>
-                  Fecha
-                </span>
-                <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'flex-start' }}>
-                  <strong style={{ fontSize: 'clamp(18px, 2.2vh, 26px)', fontWeight: 800, color: '#f59e0b', lineHeight: 1.1 }}>
-                    {currentPanel.fechaSecuencia 
-                      ? new Date(currentPanel.fechaSecuencia).toLocaleString('es-AR', {
-                          day: '2-digit',
-                          month: '2-digit',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          second: '2-digit'
-                        })
-                      : 'N/A'}
-                  </strong>
-                </div>
-              </div>
+              {/* Row 3 & 4: split left (Fecha & Codigo) and right (QR) */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px', minHeight: 0 }}>
+                {/* Left Column (Fecha & Codigo) */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', minHeight: 0 }}>
+                  
+                  {/* Fecha Card */}
+                  <div style={{ 
+                    background: 'rgba(255,255,255,0.02)', 
+                    padding: '10px 18px', 
+                    borderRadius: '12px', 
+                    border: '1px solid rgba(255,255,255,0.06)', 
+                    borderLeft: '4px solid #f59e0b',
+                    boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.2)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    flex: 1,
+                    minHeight: 0
+                  }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px' }}>
+                      Fecha
+                    </span>
+                    <strong style={{ fontSize: 'clamp(13px, 1.8vh, 20px)', fontWeight: 800, color: '#f59e0b', lineHeight: 1.1 }}>
+                      {currentPanel.fechaSecuencia 
+                        ? new Date(currentPanel.fechaSecuencia).toLocaleString('es-AR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })
+                        : 'N/A'}
+                    </strong>
+                  </div>
 
-              {/* Row 4: Código (Full width) */}
-              <div style={{ 
-                background: 'rgba(255,255,255,0.02)', 
-                padding: '10px 18px', 
-                borderRadius: '12px', 
-                border: '1px solid rgba(255,255,255,0.06)', 
-                borderLeft: '4px solid #6b7280',
-                boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.2)',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                minHeight: 0
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px' }}>
-                    Codigo
-                  </span>
-                  <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>
-                    OP: {currentPanel.iD_OrdenProduccion} | Cola: {currentPanel.orden}
-                  </span>
+                  {/* Codigo Card */}
+                  <div style={{ 
+                    background: 'rgba(255,255,255,0.02)', 
+                    padding: '10px 18px', 
+                    borderRadius: '12px', 
+                    border: '1px solid rgba(255,255,255,0.06)', 
+                    borderLeft: '4px solid #6b7280',
+                    boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.2)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    flex: 1,
+                    minHeight: 0
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px' }}>
+                        Codigo
+                      </span>
+                      <span style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>
+                        OP: {currentPanel.iD_OrdenProduccion}
+                      </span>
+                    </div>
+                    <strong style={{ fontSize: 'clamp(13px, 2vh, 22px)', fontWeight: 800, color: '#ffffff', lineHeight: 1.1, fontFamily: 'monospace' }}>
+                      {currentPanel.referencia}
+                    </strong>
+                  </div>
+
                 </div>
-                <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'flex-start' }}>
-                  <strong style={{ fontSize: 'clamp(18px, 2.5vh, 28px)', fontWeight: 800, color: '#ffffff', lineHeight: 1.1, fontFamily: 'monospace', letterSpacing: '0.5px' }}>
-                    {currentPanel.referencia}
-                  </strong>
+
+                {/* Right Column: QR Card */}
+                <div style={{ 
+                  background: 'rgba(255,255,255,0.02)', 
+                  padding: '12px 18px', 
+                  borderRadius: '12px', 
+                  border: '1px solid rgba(255,255,255,0.06)', 
+                  borderLeft: '4px solid #3b82f6',
+                  boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.2)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  minHeight: 0
+                }}>
+                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px', alignSelf: 'flex-start' }}>
+                    QR
+                  </span>
+                  <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', padding: '6px', background: '#ffffff', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
+                    <QRCodeSVG value={currentPanel.secuencia.toString()} size={90} level="H" includeMargin={false} />
+                  </div>
                 </div>
+
               </div>
 
             </div>
@@ -1012,7 +997,7 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
                     </button>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
                       <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>O ESCANEA CÓDIGO DE CONTROL:</span>
-                      <Barcode39 value="CMD-RETRY" />
+                      <ControlQRCode value="CMD-RETRY" />
                     </div>
                   </div>
                 )}
@@ -1025,7 +1010,7 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
                     </button>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
                       <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>O ESCANEA CÓDIGO DE CONTROL:</span>
-                      <Barcode39 value="CMD-RESET" />
+                      <ControlQRCode value="CMD-RESET" />
                     </div>
                   </div>
                 )}
@@ -1047,7 +1032,7 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
                     <p style={{ fontSize: '13px', margin: '0 0 10px 0', maxWidth: '300px', lineHeight: '1.5', textAlign: 'center' }}>
                       Este panel se procesa <strong style={{ color: '#10b981' }}>SIN ORNAMENTO</strong>. Escanea el código de control abajo para imprimir Kanban y avanzar.
                     </p>
-                    <Barcode39 value="CMD-NO-ORN" height={60} />
+                    <ControlQRCode value="CMD-NO-ORN" />
                     <button className="btn btn-primary btn-large" onClick={handleConfirmNoOrnament} style={{ backgroundColor: '#10b981', width: '80%', padding: '12px 0', marginTop: '10px' }}>
                       CONFIRMAR PANEL SIN ORNAMENTO
                     </button>
