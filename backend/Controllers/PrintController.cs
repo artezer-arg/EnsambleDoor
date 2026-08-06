@@ -72,5 +72,30 @@ namespace Backend.Controllers
                 return StatusCode(500, new { message = "Error de impresión.", detail = ex.Message });
             }
         }
+
+        [HttpPost("preview")]
+        public async System.Threading.Tasks.Task<IActionResult> GeneratePreview([FromBody] PreviewRequest request)
+        {
+            if (request == null || string.IsNullOrEmpty(request.ZplTemplate))
+            {
+                return BadRequest(new { message = "La plantilla ZPL no puede estar vacía." });
+            }
+
+            try
+            {
+                string base64Preview = await _printer.GeneratePreviewAsync(request.ZplTemplate, request.ValidationData);
+                return Ok(new { preview = base64Preview });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error al generar la vista previa.", detail = ex.Message });
+            }
+        }
+    }
+
+    public class PreviewRequest
+    {
+        public string ZplTemplate { get; set; } = string.Empty;
+        public Validacion ValidationData { get; set; } = new Validacion();
     }
 }

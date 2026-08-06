@@ -239,6 +239,12 @@ namespace Backend.Services
             return output;
         }
 
+        public async Task<string> GeneratePreviewAsync(string zplTemplate, Validacion validation)
+        {
+            string processedZpl = ReplaceZplPlaceholders(zplTemplate, validation);
+            return await GetLabelPreviewAsync(processedZpl, validation);
+        }
+
         private async Task<string> GetLabelPreviewAsync(string zplCode, Validacion validation)
         {
             bool checkOnline = false;

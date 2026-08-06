@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { OperativeView } from './components/OperativeView';
 import { HistoryView } from './components/HistoryView';
 import { ConfigView } from './components/ConfigView';
-import { Settings, BarChart2, Cpu } from 'lucide-react';
+import { LabelDesigner } from './components/LabelDesigner';
+import { Settings, BarChart2, Cpu, Palette } from 'lucide-react';
 
-type ViewMode = 'OPERATIVE' | 'HISTORY' | 'CONFIG';
+type ViewMode = 'OPERATIVE' | 'HISTORY' | 'CONFIG' | 'DESIGNER';
 
 function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('OPERATIVE');
@@ -153,6 +154,29 @@ function App() {
             </button>
 
             <button 
+              onClick={() => setViewMode('DESIGNER')}
+              style={{
+                width: '56px',
+                height: '56px',
+                borderRadius: '10px',
+                border: 'none',
+                cursor: 'pointer',
+                backgroundColor: viewMode === 'DESIGNER' ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                color: viewMode === 'DESIGNER' ? '#3b82f6' : 'var(--text-secondary)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px',
+                transition: 'all 0.2s ease'
+              }}
+              title="Diseñador de Etiquetas"
+            >
+              <Palette size={22} />
+              <span style={{ fontSize: '8px', fontWeight: 700 }}>DESIGN</span>
+            </button>
+
+            <button 
               onClick={() => setViewMode('CONFIG')}
               style={{
                 width: '56px',
@@ -228,6 +252,14 @@ function App() {
 
         {viewMode === 'CONFIG' && (
           <ConfigView 
+            apiBaseUrl={apiBaseUrl}
+            onClose={() => setViewMode('OPERATIVE')}
+            onConfigUpdated={reloadFromDbConfig}
+          />
+        )}
+
+        {viewMode === 'DESIGNER' && (
+          <LabelDesigner 
             apiBaseUrl={apiBaseUrl}
             onClose={() => setViewMode('OPERATIVE')}
             onConfigUpdated={reloadFromDbConfig}
