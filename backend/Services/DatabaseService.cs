@@ -387,5 +387,12 @@ namespace Backend.Services
             sql += " ORDER BY ID_Validacion DESC";
             return await conn.QueryAsync<Validacion>(sql, parameters);
         }
+
+        public async Task<PanelSequence?> GetOrderProductionByIdAsync(int idOrdenProduccion)
+        {
+            using var conn = GetConnection();
+            string sql = "SELECT Referencia, ID_OrdenProduccion, ID_OrdenCliente, Orden, Secuencia, SD, (Posicion + Mano) AS Expr1, Puesto, Fecha_Secuencia AS FechaSecuencia, Mano, Posicion FROM dbo.Orden_Produccion WHERE ID_OrdenProduccion = @Id;";
+            return await conn.QueryFirstOrDefaultAsync<PanelSequence>(sql, new { Id = idOrdenProduccion });
+        }
     }
 }

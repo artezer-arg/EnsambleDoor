@@ -89,25 +89,28 @@ namespace Backend.Controllers
             var configs = await _dbService.GetConfigsAsync();
             var serverTime = await _dbService.GetServerDateTimeAsync();
 
+            // Fetch order from database to ensure metadata matches the database truth
+            var dbOrder = await _dbService.GetOrderProductionByIdAsync(request.ID_OrdenProduccion);
+
             var validation = new Validacion
             {
                 ID_OrdenProduccion = request.ID_OrdenProduccion,
-                ID_OrdenCliente = request.ID_OrdenCliente,
-                Orden = request.Orden,
-                Secuencia = request.Secuencia,
-                SD = request.SD,
-                Referencia = request.PanelReference,
+                ID_OrdenCliente = dbOrder != null ? dbOrder.ID_OrdenCliente : request.ID_OrdenCliente,
+                Orden = dbOrder != null ? dbOrder.Orden : request.Orden,
+                Secuencia = dbOrder != null ? dbOrder.Secuencia : request.Secuencia,
+                SD = dbOrder != null ? dbOrder.SD : request.SD,
+                Referencia = dbOrder != null ? dbOrder.Referencia : request.PanelReference,
                 Puesto = request.Puesto,
                 Operador = request.Operador,
                 FechaActualServidor = serverTime,
                 QrCompleto = request.Qr,
                 ResultadoGeneral = "RECHAZADO",
-                Mano = request.Mano,
-                Posicion = request.Posicion
+                Mano = dbOrder != null ? dbOrder.Mano : request.Mano,
+                Posicion = dbOrder != null ? dbOrder.Posicion : request.Posicion
             };
 
             // 1. Check Equivalence Config
-            var equiv = await _dbService.GetEquivalenceAsync(request.PanelReference);
+            var equiv = await _dbService.GetEquivalenceAsync(validation.Referencia);
             if (equiv == null)
             {
                 validation.ResultadoGeneral = "RECHAZADO";
@@ -276,28 +279,31 @@ namespace Backend.Controllers
             var configs = await _dbService.GetConfigsAsync();
             var serverTime = await _dbService.GetServerDateTimeAsync();
 
+            // Fetch order from database to ensure metadata matches the database truth
+            var dbOrder = await _dbService.GetOrderProductionByIdAsync(request.ID_OrdenProduccion);
+
             var validation = new Validacion
             {
                 ID_OrdenProduccion = request.ID_OrdenProduccion,
-                ID_OrdenCliente = request.ID_OrdenCliente,
-                Orden = request.Orden,
-                Secuencia = request.Secuencia,
-                SD = request.SD,
-                Referencia = request.PanelReference,
+                ID_OrdenCliente = dbOrder != null ? dbOrder.ID_OrdenCliente : request.ID_OrdenCliente,
+                Orden = dbOrder != null ? dbOrder.Orden : request.Orden,
+                Secuencia = dbOrder != null ? dbOrder.Secuencia : request.Secuencia,
+                SD = dbOrder != null ? dbOrder.SD : request.SD,
+                Referencia = dbOrder != null ? dbOrder.Referencia : request.PanelReference,
                 Puesto = request.Puesto,
                 Operador = request.Operador,
                 FechaActualServidor = serverTime,
-                QrCompleto = $"SIN_ORNAMENTO_OP_{request.ID_OrdenProduccion}_SEC_{request.Secuencia}_{Guid.NewGuid().ToString().Substring(0, 8)}",
+                QrCompleto = $"SIN_ORNAMENTO_OP_{request.ID_OrdenProduccion}_SEC_{(dbOrder != null ? dbOrder.Secuencia : request.Secuencia)}_{Guid.NewGuid().ToString().Substring(0, 8)}",
                 ResultadoGeneral = "APROBADO",
                 ResultadoCorrespondencia = "N/A",
                 ResultadoCurado = "N/A",
                 EstadoImpresion = "PENDIENTE",
-                Mano = request.Mano,
-                Posicion = request.Posicion
+                Mano = dbOrder != null ? dbOrder.Mano : request.Mano,
+                Posicion = dbOrder != null ? dbOrder.Posicion : request.Posicion
             };
 
             // Check Equivalence
-            var equiv = await _dbService.GetEquivalenceAsync(request.PanelReference);
+            var equiv = await _dbService.GetEquivalenceAsync(validation.Referencia);
             if (equiv == null)
             {
                 validation.ResultadoGeneral = "RECHAZADO";

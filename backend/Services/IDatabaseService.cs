@@ -27,5 +27,6 @@ namespace Backend.Services
         Task<IEnumerable<Validacion>> GetValidationHistoryAsync(
             DateTime? desde, DateTime? hasta, string? panel, string? ornament, 
             int? ordenId, int? secuencia, string? puesto, string? result, string? motivo);
+        Task<PanelSequence?> GetOrderProductionByIdAsync(int idOrdenProduccion);
     }
 }
