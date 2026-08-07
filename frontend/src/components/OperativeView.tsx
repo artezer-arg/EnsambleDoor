@@ -374,6 +374,8 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
           Expr1: currentPanel.expr1,
           Puesto: puesto,
           Operador: operador,
+          Mano: currentPanel.mano,
+          Posicion: currentPanel.posicion,
 
           // camelCase
           qr: normalizedQr,
@@ -385,7 +387,9 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
           sd: currentPanel.sd,
           expr1: currentPanel.expr1,
           puesto: puesto,
-          operador: operador
+          operador: operador,
+          mano: currentPanel.mano,
+          posicion: currentPanel.posicion
         })
       });
 
@@ -493,6 +497,8 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
           Expr1: currentPanel.expr1,
           Puesto: puesto,
           Operador: operador,
+          Mano: currentPanel.mano,
+          Posicion: currentPanel.posicion,
 
           // camelCase
           panelReference: currentPanel.referencia,
@@ -503,7 +509,9 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
           sd: currentPanel.sd,
           expr1: currentPanel.expr1,
           puesto: puesto,
-          operador: operador
+          operador: operador,
+          mano: currentPanel.mano,
+          posicion: currentPanel.posicion
         })
       });
 

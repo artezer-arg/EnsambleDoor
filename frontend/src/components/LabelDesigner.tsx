@@ -1023,6 +1023,7 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
                       key={el.id}
                       style={elementStyle}
                       onMouseDown={(e) => handleElementMouseDown(e, el)}
+                      onClick={(e) => e.stopPropagation()}
                       onMouseEnter={(e) => {
                         if (!isSelected) e.currentTarget.style.borderColor = '#999';
                       }}

@@ -223,7 +223,11 @@ namespace Backend.Services
             
             // Safe Mano / Pos extraction
             string mano = "N/A";
-            if (!string.IsNullOrEmpty(val.CodigoOrnamentoLeido) && val.CodigoOrnamentoLeido.Length >= 5)
+            if (!string.IsNullOrEmpty(val.Posicion) || !string.IsNullOrEmpty(val.Mano))
+            {
+                mano = $"{val.Posicion ?? "N/A"} - {val.Mano ?? "N/A"}";
+            }
+            else if (!string.IsNullOrEmpty(val.CodigoOrnamentoLeido) && val.CodigoOrnamentoLeido.Length >= 5)
             {
                 mano = "F - " + val.CodigoOrnamentoLeido.Substring(val.CodigoOrnamentoLeido.Length - 5);
             }
@@ -389,7 +393,11 @@ namespace Backend.Services
 
             g.DrawString("Posición y Mano:", labelFont, Brushes.DimGray, 25, 375);
             string mano = "N/A";
-            if (!string.IsNullOrEmpty(val.CodigoOrnamentoLeido) && val.CodigoOrnamentoLeido.Length >= 5)
+            if (!string.IsNullOrEmpty(val.Posicion) || !string.IsNullOrEmpty(val.Mano))
+            {
+                mano = $"{val.Posicion ?? "N/A"} - {val.Mano ?? "N/A"}";
+            }
+            else if (!string.IsNullOrEmpty(val.CodigoOrnamentoLeido) && val.CodigoOrnamentoLeido.Length >= 5)
             {
                 mano = "F - " + val.CodigoOrnamentoLeido.Substring(val.CodigoOrnamentoLeido.Length - 5);
             }
@@ -397,7 +405,7 @@ namespace Backend.Services
             {
                 mano = "F - " + val.CodigoOrnamentoLeido;
             }
-            g.DrawString(string.IsNullOrEmpty(val.CodigoOrnamentoLeido) ? "SIN ORNAMENTO" : mano, boldFont, Brushes.Black, 25, 395);
+            g.DrawString(mano, boldFont, Brushes.Black, 25, 395);
 
             // Right Section: Curing and QR info
             g.DrawString("INICIO CURADO:", labelFont, Brushes.DimGray, 425, 80);

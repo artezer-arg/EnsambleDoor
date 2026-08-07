@@ -101,7 +101,9 @@ namespace Backend.Controllers
                 Operador = request.Operador,
                 FechaActualServidor = serverTime,
                 QrCompleto = request.Qr,
-                ResultadoGeneral = "RECHAZADO"
+                ResultadoGeneral = "RECHAZADO",
+                Mano = request.Mano,
+                Posicion = request.Posicion
             };
 
             // 1. Check Equivalence Config
@@ -289,7 +291,9 @@ namespace Backend.Controllers
                 ResultadoGeneral = "APROBADO",
                 ResultadoCorrespondencia = "N/A",
                 ResultadoCurado = "N/A",
-                EstadoImpresion = "PENDIENTE"
+                EstadoImpresion = "PENDIENTE",
+                Mano = request.Mano,
+                Posicion = request.Posicion
             };
 
             // Check Equivalence
@@ -455,6 +459,8 @@ namespace Backend.Controllers
         public string Expr1 { get; set; } = string.Empty;
         public string Puesto { get; set; } = string.Empty;
         public string Operador { get; set; } = "OPERADOR";
+        public string? Mano { get; set; }
+        public string? Posicion { get; set; }
     }
 
     public class ConfirmNoOrnamentRequest
@@ -468,6 +474,8 @@ namespace Backend.Controllers
         public string Expr1 { get; set; } = string.Empty;
         public string Puesto { get; set; } = string.Empty;
         public string Operador { get; set; } = "OPERADOR";
+        public string? Mano { get; set; }
+        public string? Posicion { get; set; }
     }
 
     public class RetryCompleteRequest

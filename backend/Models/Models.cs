@@ -61,6 +61,8 @@ namespace Backend.Models
         public string? EstadoImpresion { get; set; }
         public DateTime? FechaAvancePuntero { get; set; }
         public string? MensajeErrorTecnico { get; set; }
+        public string? Mano { get; set; }
+        public string? Posicion { get; set; }
     }
 
     public class ConfigValue

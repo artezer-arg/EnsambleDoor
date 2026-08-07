@@ -275,7 +275,8 @@ namespace Backend.Services
                     CodigoOrnamentoEsperado, CodigoOrnamentoLeido, QrCompleto, NumeroSerie, Lote,
                     InicioCurado, FechaActualServidor, MinutosCurado, TiempoMinimoRequerido,
                     ResultadoCurado, ResultadoCorrespondencia, ResultadoGeneral, MotivoRechazo,
-                    Puesto, Operador, FechaLectura, EstadoImpresion, MensajeErrorTecnico
+                    Puesto, Operador, FechaLectura, EstadoImpresion, MensajeErrorTecnico,
+                    Mano, Posicion
                 )
                 VALUES
                 (
@@ -283,7 +284,8 @@ namespace Backend.Services
                     @CodigoOrnamentoEsperado, @CodigoOrnamentoLeido, @QrCompleto, @NumeroSerie, @Lote,
                     @InicioCurado, GETDATE(), @MinutosCurado, @TiempoMinimoRequerido,
                     @ResultadoCurado, @ResultadoCorrespondencia, @ResultadoGeneral, @MotivoRechazo,
-                    @Puesto, @Operador, GETDATE(), @EstadoImpresion, @MensajeErrorTecnico
+                    @Puesto, @Operador, GETDATE(), @EstadoImpresion, @MensajeErrorTecnico,
+                    @Mano, @Posicion
                 );
                 SELECT CAST(SCOPE_IDENTITY() as int);";
             
