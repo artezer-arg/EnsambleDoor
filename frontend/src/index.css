@@ -1,10 +1,12 @@
 :root {
-  --bg-color: #0b0f19;
-  --panel-bg: rgba(22, 28, 45, 0.7);
-  --border-color: rgba(255, 255, 255, 0.08);
-  --text-primary: #ffffff;
-  --text-secondary: #8e9aa8;
-  --accent-color: #3b82f6;
+  --bg-color: #f8fafc;
+  --panel-bg: rgba(255, 255, 255, 0.45);
+  --panel-bg-hover: rgba(255, 255, 255, 0.55);
+  --border-color: rgba(255, 255, 255, 0.45);
+  --text-primary: #0f172a;     /* Slate 900 for high readability */
+  --text-secondary: #475569;   /* Slate 600 */
+  --accent-color: #2563eb;     /* Royal Blue */
+  --accent-color-hover: #1d4ed8;
   
   /* Workstation Visual States */
   --state-waiting: #2563eb;      /* Blue */
@@ -12,12 +14,12 @@
   --state-approved: #059669;     /* Green */
   --state-rejected: #dc2626;     /* Red */
   --state-error: #ea580c;        /* Orange */
-  --state-idle: #4b5563;         /* Gray */
+  --state-idle: #475569;         /* Gray/Slate */
 
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: 'Outfit', 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  color-scheme: dark;
+  color-scheme: light;
   background-color: var(--bg-color);
   color: var(--text-primary);
   margin: 0;
@@ -30,33 +32,44 @@ body {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
+  /* Beautiful multi-point gradient matching the design reference */
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(216, 241, 230, 0.6) 0px, transparent 50%), 
+    radial-gradient(at 50% 0%, rgba(224, 231, 255, 0.6) 0px, transparent 50%), 
+    radial-gradient(at 100% 0%, rgba(250, 232, 255, 0.6) 0px, transparent 50%), 
+    radial-gradient(at 0% 100%, rgba(219, 234, 254, 0.6) 0px, transparent 50%), 
+    radial-gradient(at 100% 100%, rgba(240, 253, 244, 0.6) 0px, transparent 50%), 
+    linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  background-attachment: fixed;
 }
 
 /* Glassmorphism Panel styles */
 .card-panel {
   background: var(--panel-bg);
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(24px) saturate(120%);
+  -webkit-backdrop-filter: blur(24px) saturate(120%);
   border: 1px solid var(--border-color);
-  border-radius: 12px;
+  border-radius: 16px;
   padding: 24px;
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-  transition: all 0.3s ease;
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Scrollbar styling */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.2);
 }
 
 /* Button styles */
@@ -65,76 +78,95 @@ body {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 12px 24px;
-  font-size: 16px;
+  padding: 10px 20px;
+  font-size: 14px;
   font-weight: 600;
-  border-radius: 8px;
+  border-radius: 10px;
   border: 1px solid transparent;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   user-select: none;
 }
 
 .btn-primary {
-  background-color: var(--accent-color);
-  color: white;
+  /* Solid charcoal black primary buttons style */
+  background-color: #0f172a;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
 }
 .btn-primary:hover {
-  background-color: #2563eb;
+  background-color: #1e293b;
   transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.2);
 }
 .btn-primary:active {
   transform: translateY(0);
 }
 
 .btn-secondary {
-  background-color: rgba(255, 255, 255, 0.06);
-  border: 1px solid var(--border-color);
-  color: white;
+  /* Elegant glassmorphic button style */
+  background-color: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  color: #334155;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
 }
 .btn-secondary:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: rgba(255, 255, 255, 0.85);
+  border-color: rgba(255, 255, 255, 0.9);
+  color: #0f172a;
+  transform: translateY(-1px);
+}
+.btn-secondary:active {
+  transform: translateY(0);
 }
 
 .btn-danger {
   background-color: var(--state-rejected);
   color: white;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.15);
 }
 .btn-danger:hover {
   background-color: #b91c1c;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(220, 38, 38, 0.2);
 }
 
 .btn-large {
-  padding: 20px 40px;
-  font-size: 20px;
+  padding: 16px 32px;
+  font-size: 18px;
   border-radius: 12px;
 }
 
 /* Inputs and Forms */
 .form-group {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 .form-group label {
   display: block;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--text-secondary);
-  margin-bottom: 8px;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 .form-input {
   width: 100%;
-  padding: 12px 16px;
-  font-size: 15px;
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
-  background-color: rgba(0, 0, 0, 0.2);
-  color: white;
+  padding: 10px 14px;
+  font-size: 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background-color: rgba(255, 255, 255, 0.5);
+  color: var(--text-primary);
   outline: none;
   box-sizing: border-box;
-  transition: border-color 0.2s ease;
+  transition: all 0.2s ease;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 .form-input:focus {
   border-color: var(--accent-color);
+  background-color: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12), inset 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 
 /* Table styles */
@@ -148,18 +180,68 @@ body {
   text-align: left;
 }
 .data-table th, .data-table td {
-  padding: 16px;
-  border-bottom: 1px solid var(--border-color);
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 }
 .data-table th {
   color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 700;
   text-transform: uppercase;
-  background-color: rgba(255, 255, 255, 0.02);
+  letter-spacing: 0.5px;
+  background-color: rgba(255, 255, 255, 0.35);
+  border-bottom: 2px solid rgba(0, 0, 0, 0.05);
+}
+.data-table tr {
+  transition: background-color 0.2s ease;
 }
 .data-table tr:hover {
-  background-color: rgba(255, 255, 255, 0.02);
+  background-color: rgba(255, 255, 255, 0.25);
+}
+
+/* Status badging */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 9999px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.status-pill.approved {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: #065f46;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+.status-pill.rejected {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #991b1b;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+.status-pill.warning {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: #92400e;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+/* State card styles with custom visual accents */
+.state-indicator-card {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 12px;
+  padding: 14px 18px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.015);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.state-indicator-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.03);
 }
 
 /* Pulse Animation */
@@ -178,5 +260,54 @@ body {
   to { transform: translateY(0); opacity: 1; }
 }
 .slide-up {
-  animation: slideUp 0.3s forwards ease-out;
+  animation: slideUp 0.35s forwards cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+/* Custom indicator card matching 3D mockup design */
+.indicator-accent-card {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 12px;
+  padding: 10px 14px;
+  box-shadow: 0 8px 24px rgba(31, 38, 135, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: relative;
+  transition: all 0.3s ease;
+  min-height: 54px;
+  justify-content: center;
+  box-sizing: border-box;
+}
+.indicator-accent-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(31, 38, 135, 0.08);
+}
+.indicator-accent-card::after {
+  content: '';
+  position: absolute;
+  bottom: 8px;
+  left: 14px;
+  width: 14px;
+  height: 3px;
+  background: var(--accent-color);
+  border-radius: 2px;
+}
+.indicator-accent-card.accent-sd::after {
+  background: #059669;
+}
+.indicator-accent-card.accent-posicion::after {
+  background: #7c3aed;
+}
+.indicator-accent-card.accent-mano::after {
+  background: #db2777;
+}
+.indicator-accent-card.accent-fecha::after {
+  background: #d97706;
+}
+.indicator-accent-card.accent-codigo::after {
+  background: #64748b;
+}
+

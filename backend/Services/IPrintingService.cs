@@ -17,6 +17,6 @@ namespace Backend.Services
     {
         IEnumerable<string> GetInstalledPrinters();
         Task<PrintJobResult> PrintKanbanAsync(Validacion validation, Dictionary<string, string> config);
-        Task<string> GeneratePreviewAsync(string zplTemplate, Validacion validation);
+        Task<string> GeneratePreviewAsync(string zplTemplate, Validacion validation, double? widthInches = null, double? heightInches = null, int? dpi = null);
     }
 }

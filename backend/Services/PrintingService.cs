@@ -76,9 +76,16 @@ namespace Backend.Services
 
     public class PrintingService : IPrintingService
     {
+        private readonly IDatabaseService _dbService;
         private static bool _isLabelaryAvailable = true;
         private static DateTime _lastConnectionCheck = DateTime.MinValue;
         private static readonly object _checkLock = new object();
+
+        public PrintingService(IDatabaseService dbService)
+        {
+            _dbService = dbService;
+        }
+
         public IEnumerable<string> GetInstalledPrinters()
         {
             var printers = new List<string>();
@@ -98,13 +105,21 @@ namespace Backend.Services
 
         public async Task<PrintJobResult> PrintKanbanAsync(Validacion validation, Dictionary<string, string> config)
         {
-            bool simulatorEnabled = bool.Parse(config.GetValueOrDefault("Printer_Simulator_Enabled", "true"));
-            string printerMode = config.GetValueOrDefault("Printer_Mode", "Spooler"); // Spooler, NetworkRaw
-            string printerName = config.GetValueOrDefault("Printer_Name", "Microsoft Print to PDF");
-            string printerIp = config.GetValueOrDefault("Printer_IP", "192.168.1.100");
-            int printerPort = int.Parse(config.GetValueOrDefault("Printer_Port", "9100"));
-            string zplTemplate = config.GetValueOrDefault("Printer_Zpl_Template", "");
-            int copies = int.Parse(config.GetValueOrDefault("Print_Copies", "1"));
+            // Load all database configs as base
+            var mergedConfig = await _dbService.GetConfigsAsync();
+            // Merge passed overrides (like Printer_Name or Printer_Simulator_Enabled from TestPrint)
+            foreach (var kvp in config)
+            {
+                mergedConfig[kvp.Key] = kvp.Value;
+            }
+
+            bool simulatorEnabled = bool.Parse(mergedConfig.GetValueOrDefault("Printer_Simulator_Enabled", "true"));
+            string printerMode = mergedConfig.GetValueOrDefault("Printer_Mode", "Spooler"); // Spooler, NetworkRaw
+            string printerName = mergedConfig.GetValueOrDefault("Printer_Name", "Microsoft Print to PDF");
+            string printerIp = mergedConfig.GetValueOrDefault("Printer_IP", "192.168.1.100");
+            int printerPort = int.Parse(mergedConfig.GetValueOrDefault("Printer_Port", "9100"));
+            string zplTemplate = mergedConfig.GetValueOrDefault("Printer_Zpl_Template", "");
+            int copies = int.Parse(mergedConfig.GetValueOrDefault("Print_Copies", "1"));
 
             if (copies <= 0) copies = 1;
 
@@ -116,7 +131,7 @@ namespace Backend.Services
                 string processedZpl = ReplaceZplPlaceholders(zplTemplate, validation);
 
                 // 2. Generate the base64 preview (Hybrid preview: Labelary online -> C# GDI fallback offline)
-                result.Base64LabelPreview = await GetLabelPreviewAsync(processedZpl, validation);
+                result.Base64LabelPreview = await GetLabelPreviewAsync(processedZpl, validation, mergedConfig);
 
                 // 3. Save simulation file if requested (for logging/development testing)
                 string targetFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "PrintedLabels");
@@ -148,6 +163,7 @@ namespace Backend.Services
                     {
                         // Check if printer selected is a Zebra (or Generic/Text Only) to use ZPL raw spooling
                         bool isZebraDriver = printerName.IndexOf("Zebra", StringComparison.OrdinalIgnoreCase) >= 0 
+                                             || printerName.IndexOf("ZDesigner", StringComparison.OrdinalIgnoreCase) >= 0
                                              || printerName.IndexOf("Generic", StringComparison.OrdinalIgnoreCase) >= 0;
 
                         if (isZebraDriver)
@@ -183,7 +199,52 @@ namespace Backend.Services
 
                             doc.PrintPage += (sender, ev) =>
                             {
-                                DrawLabel(ev.Graphics!, validation);
+                                try
+                                {
+                                    if (!string.IsNullOrEmpty(result.Base64LabelPreview))
+                                    {
+                                        byte[] imageBytes = Convert.FromBase64String(result.Base64LabelPreview);
+                                        using (var ms = new MemoryStream(imageBytes))
+                                        {
+                                            using (var img = Image.FromStream(ms))
+                                            {
+                                                // Calculate fitting rectangle
+                                                // Keep aspect ratio
+                                                float imgAspect = (float)img.Width / img.Height;
+                                                float printAspect = (float)ev.MarginBounds.Width / ev.MarginBounds.Height;
+                                                
+                                                int drawWidth = ev.MarginBounds.Width;
+                                                int drawHeight = ev.MarginBounds.Height;
+                                                int drawX = ev.MarginBounds.Left;
+                                                int drawY = ev.MarginBounds.Top;
+
+                                                if (imgAspect > printAspect)
+                                                {
+                                                    drawHeight = (int)(ev.MarginBounds.Width / imgAspect);
+                                                    drawY = ev.MarginBounds.Top + (ev.MarginBounds.Height - drawHeight) / 2;
+                                                }
+                                                else
+                                                {
+                                                    drawWidth = (int)(ev.MarginBounds.Height * imgAspect);
+                                                    drawX = ev.MarginBounds.Left + (ev.MarginBounds.Width - drawWidth) / 2;
+                                                }
+
+                                                ev.Graphics.DrawImage(img, drawX, drawY, drawWidth, drawHeight);
+                                            }
+                                        }
+                                    }
+                                    else
+                                    {
+                                        var (w, h) = ParseZplDimensions(processedZpl, mergedConfig);
+                                        DrawZplLabel(ev.Graphics!, processedZpl, w, h);
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    Console.WriteLine($"Error al renderizar etiqueta para impresión GDI, reintentando dibujo directo: {ex.Message}");
+                                    var (w, h) = ParseZplDimensions(processedZpl, mergedConfig);
+                                    DrawZplLabel(ev.Graphics!, processedZpl, w, h);
+                                }
                                 ev.HasMorePages = false;
                             };
 
@@ -243,14 +304,30 @@ namespace Backend.Services
             return output;
         }
 
-        public async Task<string> GeneratePreviewAsync(string zplTemplate, Validacion validation)
+        public async Task<string> GeneratePreviewAsync(
+            string zplTemplate, 
+            Validacion validation, 
+            double? widthInches = null, 
+            double? heightInches = null, 
+            int? dpi = null)
         {
+            var config = await _dbService.GetConfigsAsync();
+            if (widthInches.HasValue) config["Printer_Label_Width_Inches"] = widthInches.Value.ToString();
+            if (heightInches.HasValue) config["Printer_Label_Height_Inches"] = heightInches.Value.ToString();
+            if (dpi.HasValue) config["Printer_Label_DPI"] = dpi.Value.ToString();
+
             string processedZpl = ReplaceZplPlaceholders(zplTemplate, validation);
-            return await GetLabelPreviewAsync(processedZpl, validation);
+            return await GetLabelPreviewAsync(processedZpl, validation, config);
         }
 
-        private async Task<string> GetLabelPreviewAsync(string zplCode, Validacion validation)
+        private async Task<string> GetLabelPreviewAsync(string zplCode, Validacion validation, Dictionary<string, string> config)
         {
+            double widthInches = double.Parse(config.GetValueOrDefault("Printer_Label_Width_Inches", "4"));
+            double heightInches = double.Parse(config.GetValueOrDefault("Printer_Label_Height_Inches", "3"));
+            int dpi = int.Parse(config.GetValueOrDefault("Printer_Label_DPI", "203"));
+
+            string dpmmStr = (dpi == 300) ? "12dpmm" : (dpi == 600) ? "24dpmm" : "8dpmm";
+
             bool checkOnline = false;
             lock (_checkLock)
             {
@@ -267,7 +344,7 @@ namespace Backend.Services
                 {
                     using var httpClient = new HttpClient();
                     httpClient.Timeout = TimeSpan.FromSeconds(2); // Fast check
-                    string url = "http://api.labelary.com/v1/printers/8dpmm/labels/6x4/0/";
+                    string url = $"http://api.labelary.com/v1/printers/{dpmmStr}/labels/{widthInches}x{heightInches}/0/";
                     var response = await httpClient.PostAsync(url, new StringContent(zplCode, Encoding.UTF8, "application/x-www-form-urlencoded"));
                     
                     if (response.IsSuccessStatusCode)
@@ -293,7 +370,7 @@ namespace Backend.Services
                 {
                     using var httpClient = new HttpClient();
                     httpClient.Timeout = TimeSpan.FromSeconds(1.5);
-                    string url = "http://api.labelary.com/v1/printers/8dpmm/labels/6x4/0/";
+                    string url = $"http://api.labelary.com/v1/printers/{dpmmStr}/labels/{widthInches}x{heightInches}/0/";
                     var response = await httpClient.PostAsync(url, new StringContent(zplCode, Encoding.UTF8, "application/x-www-form-urlencoded"));
                     if (response.IsSuccessStatusCode)
                     {
@@ -312,12 +389,14 @@ namespace Backend.Services
             }
 
             // Fallback GDI Local Drawing
-            using (var bitmap = new Bitmap(600, 450))
+            var (widthDots, heightDots) = ParseZplDimensions(zplCode, config);
+
+            using (var bitmap = new Bitmap(widthDots, heightDots))
             {
                 using (var graphics = Graphics.FromImage(bitmap))
                 {
                     graphics.Clear(Color.White);
-                    DrawLabel(graphics, validation);
+                    DrawZplLabel(graphics, zplCode, widthDots, heightDots);
                 }
 
                 using (var ms = new MemoryStream())
@@ -328,18 +407,45 @@ namespace Backend.Services
             }
         }
 
-        private async Task SendToNetworkZebraAsync(string ip, int port, string zplData)
+        private (int width, int height) ParseZplDimensions(string zpl, Dictionary<string, string> config)
+        {
+            double widthInches = double.Parse(config.GetValueOrDefault("Printer_Label_Width_Inches", "4"));
+            double heightInches = double.Parse(config.GetValueOrDefault("Printer_Label_Height_Inches", "3"));
+            int dpi = int.Parse(config.GetValueOrDefault("Printer_Label_DPI", "203"));
+
+            int width = (int)Math.Round(widthInches * dpi);
+            int height = (int)Math.Round(heightInches * dpi);
+
+            if (string.IsNullOrEmpty(zpl)) return (width, height);
+
+            var pwMatch = System.Text.RegularExpressions.Regex.Match(zpl, @"\^PW(\d+)");
+            if (pwMatch.Success)
+            {
+                int.TryParse(pwMatch.Groups[1].Value, out width);
+            }
+
+            var llMatch = System.Text.RegularExpressions.Regex.Match(zpl, @"\^LL(\d+)");
+            if (llMatch.Success)
+            {
+                int.TryParse(llMatch.Groups[1].Value, out height);
+            }
+
+            return (width, height);
+        }
+
+        private Task SendToNetworkZebraAsync(string ip, int port, string zplData)
         {
             using var client = new System.Net.Sockets.TcpClient();
             var connectTask = client.ConnectAsync(ip, port);
             
             // Timeout of 4 seconds for printer TCP socket connection
-            if (await Task.WhenAny(connectTask, Task.Delay(4000)) == connectTask)
+            if (Task.WhenAny(connectTask, Task.Delay(4000)).Result == connectTask)
             {
-                await connectTask; // propagate exceptions if connection failed
+                connectTask.Wait(); // propagate exceptions if connection failed
                 using var stream = client.GetStream();
                 byte[] data = Encoding.ASCII.GetBytes(zplData);
-                await stream.WriteAsync(data, 0, data.Length);
+                stream.Write(data, 0, data.Length);
+                return Task.CompletedTask;
             }
             else
             {
@@ -347,87 +453,221 @@ namespace Backend.Services
             }
         }
 
-        private void DrawLabel(Graphics g, Validacion val)
+        private void DrawZplLabel(Graphics g, string zpl, int canvasWidth, int canvasHeight)
         {
             g.PageUnit = GraphicsUnit.Pixel;
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
 
-            // Draw outer border
-            var borderPen = new Pen(Color.Black, 4);
-            g.DrawRectangle(borderPen, 10, 10, 580, 430);
+            if (string.IsNullOrEmpty(zpl)) return;
 
-            // Draw header bar
-            g.FillRectangle(Brushes.Black, 10, 10, 580, 55);
-            var headerFont = new Font("Arial", 16, FontStyle.Bold);
-            g.DrawString("KANBAN DE PRODUCCIÓN - PUESTO: " + val.Puesto, headerFont, Brushes.White, 30, 22);
+            // Split commands by ^ or ~
+            string[] commands = zpl.Split(new[] { '^', '~' }, StringSplitOptions.RemoveEmptyEntries);
 
-            // Draw separator line
-            var blackPen = new Pen(Color.Black, 2);
-            g.DrawLine(blackPen, 10, 240, 590, 240);
-            g.DrawLine(blackPen, 410, 65, 410, 440);
+            int lhX = 0;
+            int lhY = 0;
+            int currentX = 0;
+            int currentY = 0;
+            int globalFontSize = 24;
+            int? localFontSize = null;
 
-            // Left Section: Panel and Ornament details
-            var labelFont = new Font("Arial", 11, FontStyle.Regular);
-            var boldFont = new Font("Arial", 12, FontStyle.Bold);
-            var largePanelFont = new Font("Arial", 22, FontStyle.Bold);
-            var largeOrnamentFont = new Font("Arial", 16, FontStyle.Bold);
+            string fontFamily = "Arial";
+            FontStyle fontStyle = FontStyle.Bold;
 
-            g.DrawString("PANEL SOLICITADO:", labelFont, Brushes.DimGray, 25, 80);
-            g.DrawString(val.Referencia, largePanelFont, Brushes.Black, 25, 100);
-
-            g.DrawString("ORNAMENTO:", labelFont, Brushes.DimGray, 25, 160);
-            string ornamentText = string.IsNullOrEmpty(val.CodigoOrnamentoLeido) ? "SIN ORNAMENTO" : val.CodigoOrnamentoLeido;
-            g.DrawString(ornamentText, largeOrnamentFont, Brushes.Black, 25, 180);
-
-            // Bottom Left Section: Order details
-            g.DrawString("Orden Prod ID:", labelFont, Brushes.DimGray, 25, 255);
-            g.DrawString(val.ID_OrdenProduccion.ToString(), boldFont, Brushes.Black, 25, 275);
-
-            g.DrawString("Orden Cliente:", labelFont, Brushes.DimGray, 180, 255);
-            g.DrawString(val.ID_OrdenCliente.ToString(), boldFont, Brushes.Black, 180, 275);
-
-            g.DrawString("Nro Secuencia:", labelFont, Brushes.DimGray, 25, 315);
-            g.DrawString(val.Secuencia?.ToString() ?? "N/A", boldFont, Brushes.Black, 25, 335);
-
-            g.DrawString("Modelo / SD:", labelFont, Brushes.DimGray, 180, 315);
-            g.DrawString($"{val.SD ?? "N/A"}", boldFont, Brushes.Black, 180, 335);
-
-            g.DrawString("Posición y Mano:", labelFont, Brushes.DimGray, 25, 375);
-            string mano = "N/A";
-            if (!string.IsNullOrEmpty(val.Posicion) || !string.IsNullOrEmpty(val.Mano))
+            for (int i = 0; i < commands.Length; i++)
             {
-                mano = $"{val.Posicion ?? "N/A"} - {val.Mano ?? "N/A"}";
+                string cmd = commands[i].Trim();
+                if (string.IsNullOrEmpty(cmd)) continue;
+
+                if (cmd.StartsWith("LH", StringComparison.OrdinalIgnoreCase))
+                {
+                    var parts = cmd.Substring(2).Split(',');
+                    if (parts.Length >= 2 && int.TryParse(parts[0], out int x) && int.TryParse(parts[1], out int y))
+                    {
+                        lhX = x;
+                        lhY = y;
+                    }
+                }
+                else if (cmd.StartsWith("CF", StringComparison.OrdinalIgnoreCase))
+                {
+                    var parts = cmd.Substring(2).Split(',');
+                    if (parts.Length >= 2 && int.TryParse(parts[1], out int h))
+                    {
+                        globalFontSize = h;
+                    }
+                    else if (parts.Length == 1 && parts[0].Length > 1 && int.TryParse(parts[0].Substring(1), out int h2))
+                    {
+                        globalFontSize = h2;
+                    }
+                }
+                else if (cmd.StartsWith("FO", StringComparison.OrdinalIgnoreCase))
+                {
+                    var parts = cmd.Substring(2).Split(',');
+                    if (parts.Length >= 2)
+                    {
+                        string cleanCoords = parts[1];
+                        int index = cleanCoords.IndexOfAny(new[] { 'A', 'B', 'C', 'D', 'F', 'G', 'I', 'L', 'M', 'P', 'S', 'X' });
+                        if (index >= 0)
+                        {
+                            cleanCoords = cleanCoords.Substring(0, index);
+                        }
+                        
+                        int.TryParse(parts[0], out currentX);
+                        int.TryParse(cleanCoords, out currentY);
+                    }
+
+                    int w = 0, h = 0, t = 2;
+                    string textContent = "";
+                    bool isBarcode = false;
+                    bool isQrCode = false;
+                    int qrScale = 5;
+                    int barcodeHeight = 60;
+
+                    for (int j = i + 1; j < commands.Length; j++)
+                    {
+                        string subCmd = commands[j].Trim();
+                        if (subCmd.StartsWith("FO", StringComparison.OrdinalIgnoreCase) || 
+                            subCmd.StartsWith("XZ", StringComparison.OrdinalIgnoreCase) || 
+                            subCmd.StartsWith("XA", StringComparison.OrdinalIgnoreCase))
+                        {
+                            break;
+                        }
+
+                        if (subCmd.StartsWith("A0", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var aParts = subCmd.Substring(2).Split(',');
+                            if (aParts.Length >= 2 && int.TryParse(aParts[1], out int lh))
+                            {
+                                localFontSize = lh;
+                            }
+                            else if (aParts.Length == 1)
+                            {
+                                var match = System.Text.RegularExpressions.Regex.Match(subCmd, @"\d+$");
+                                if (match.Success && int.TryParse(match.Value, out int lh2))
+                                {
+                                    localFontSize = lh2;
+                                }
+                            }
+                        }
+                        else if (subCmd.StartsWith("GB", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var gbParts = subCmd.Substring(2).Split(',');
+                            if (gbParts.Length >= 1) int.TryParse(gbParts[0], out w);
+                            if (gbParts.Length >= 2) int.TryParse(gbParts[1], out h);
+                            if (gbParts.Length >= 3) int.TryParse(gbParts[2], out t);
+                            if (t <= 0) t = 2;
+
+                            int drawX = lhX + currentX;
+                            int drawY = lhY + currentY;
+                            if (w <= 0) w = 1;
+                            if (h <= 0) h = 1;
+
+                            using (var pen = new Pen(Color.Black, t))
+                            {
+                                g.DrawRectangle(pen, drawX, drawY, w, h);
+                            }
+                        }
+                        else if (subCmd.StartsWith("BC", StringComparison.OrdinalIgnoreCase))
+                        {
+                            isBarcode = true;
+                            var bcParts = subCmd.Substring(2).Split(',');
+                            if (bcParts.Length >= 2 && int.TryParse(bcParts[1], out int bh))
+                            {
+                                barcodeHeight = bh;
+                            }
+                        }
+                        else if (subCmd.StartsWith("BQ", StringComparison.OrdinalIgnoreCase))
+                        {
+                            isQrCode = true;
+                            var bqParts = subCmd.Substring(2).Split(',');
+                            if (bqParts.Length >= 3 && int.TryParse(bqParts[2], out int scale))
+                            {
+                                qrScale = scale;
+                            }
+                            else if (bqParts.Length == 1)
+                            {
+                                var match = System.Text.RegularExpressions.Regex.Match(subCmd, @",(\d+)$");
+                                if (match.Success && int.TryParse(match.Groups[1].Value, out int scale2))
+                                {
+                                    qrScale = scale2;
+                                }
+                            }
+                        }
+                        else if (subCmd.StartsWith("FD", StringComparison.OrdinalIgnoreCase))
+                        {
+                            textContent = subCmd.Substring(2);
+                            if (textContent.EndsWith("FS", StringComparison.OrdinalIgnoreCase))
+                            {
+                                textContent = textContent.Substring(0, textContent.Length - 2);
+                            }
+                            
+                            int drawX = lhX + currentX;
+                            int drawY = lhY + currentY;
+
+                            if (isQrCode)
+                            {
+                                string qrContent = textContent;
+                                if (qrContent.StartsWith("QA,", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    qrContent = qrContent.Substring(3);
+                                }
+                                
+                                int qrSize = qrScale * 25;
+                                g.FillRectangle(Brushes.White, drawX, drawY, qrSize, qrSize);
+                                g.DrawRectangle(Pens.Black, drawX, drawY, qrSize, qrSize);
+                                
+                                int sqSize = Math.Max(12, qrSize / 4);
+                                int sqOffset = 3;
+                                
+                                g.FillRectangle(Brushes.Black, drawX + sqOffset, drawY + sqOffset, sqSize, sqSize);
+                                g.FillRectangle(Brushes.White, drawX + sqOffset + 2, drawY + sqOffset + 2, sqSize - 4, sqSize - 4);
+                                g.FillRectangle(Brushes.Black, drawX + sqOffset + 4, drawY + sqOffset + 4, sqSize - 8, sqSize - 8);
+                                
+                                g.FillRectangle(Brushes.Black, drawX + qrSize - sqSize - sqOffset, drawY + sqOffset, sqSize, sqSize);
+                                g.FillRectangle(Brushes.White, drawX + qrSize - sqSize - sqOffset + 2, drawY + sqOffset + 2, sqSize - 4, sqSize - 4);
+                                g.FillRectangle(Brushes.Black, drawX + qrSize - sqSize - sqOffset + 4, drawY + sqOffset + 4, sqSize - 8, sqSize - 8);
+                                
+                                g.FillRectangle(Brushes.Black, drawX + sqOffset, drawY + qrSize - sqSize - sqOffset, sqSize, sqSize);
+                                g.FillRectangle(Brushes.White, drawX + sqOffset + 2, drawY + qrSize - sqSize - sqOffset + 2, sqSize - 4, sqSize - 4);
+                                g.FillRectangle(Brushes.Black, drawX + sqOffset + 4, drawY + qrSize - sqSize - sqOffset + 4, sqSize - 8, sqSize - 8);
+                                
+                                var tinyFont = new Font("Arial", 7, FontStyle.Bold);
+                                g.DrawString("QR", tinyFont, Brushes.Black, drawX + qrSize/2 - 8, drawY + qrSize/2 - 5);
+                            }
+                            else if (isBarcode)
+                            {
+                                int bcWidth = 240;
+                                g.FillRectangle(Brushes.White, drawX, drawY, bcWidth, barcodeHeight);
+                                int barX = drawX + 10;
+                                var rand = new Random(12345);
+                                while (barX < drawX + bcWidth - 10)
+                                {
+                                    int barW = rand.Next(1, 4);
+                                    g.FillRectangle(Brushes.Black, barX, drawY, barW, barcodeHeight - 12);
+                                    barX += barW + rand.Next(1, 5);
+                                }
+                                var bcFont = new Font("Courier New", 8, FontStyle.Bold);
+                                g.DrawString(textContent, bcFont, Brushes.Black, drawX + (bcWidth - textContent.Length * 6)/2, drawY + barcodeHeight - 10);
+                            }
+                            else
+                            {
+                                int fontSize = localFontSize ?? globalFontSize;
+                                float pointSize = fontSize * 0.75f;
+                                if (pointSize < 6) pointSize = 6;
+
+                                using (var font = new Font(fontFamily, pointSize, fontStyle))
+                                {
+                                    g.DrawString(textContent, font, Brushes.Black, drawX, drawY);
+                                }
+                            }
+
+                            isBarcode = false;
+                            isQrCode = false;
+                            localFontSize = null;
+                        }
+                    }
+                }
             }
-            else if (!string.IsNullOrEmpty(val.CodigoOrnamentoLeido) && val.CodigoOrnamentoLeido.Length >= 5)
-            {
-                mano = "F - " + val.CodigoOrnamentoLeido.Substring(val.CodigoOrnamentoLeido.Length - 5);
-            }
-            else if (!string.IsNullOrEmpty(val.CodigoOrnamentoLeido))
-            {
-                mano = "F - " + val.CodigoOrnamentoLeido;
-            }
-            g.DrawString(mano, boldFont, Brushes.Black, 25, 395);
-
-            // Right Section: Curing and QR info
-            g.DrawString("INICIO CURADO:", labelFont, Brushes.DimGray, 425, 80);
-            string startCureStr = val.InicioCurado?.ToString("dd/MM/yyyy HH:mm") ?? "N/A (NO LLEVA)";
-            g.DrawString(startCureStr, boldFont, Brushes.Black, 425, 100);
-
-            g.DrawString("TIEMPO CURADO:", labelFont, Brushes.DimGray, 425, 135);
-            string totalCureStr = val.MinutosCurado.HasValue ? $"{val.MinutosCurado.Value / 60} h {val.MinutosCurado.Value % 60} min" : "N/A";
-            g.DrawString(totalCureStr, boldFont, Brushes.Black, 425, 155);
-
-            g.DrawString("FECHA IMPRESIÓN:", labelFont, Brushes.DimGray, 425, 195);
-            g.DrawString(DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss"), boldFont, Brushes.Black, 425, 215);
-
-            // Draw a mock visual barcode/QR representation in the right panel
-            g.DrawRectangle(Pens.Black, 435, 260, 130, 130);
-            g.FillRectangle(Brushes.LightGray, 440, 265, 120, 120);
-            
-            var barcodeFont = new Font("Courier New", 8, FontStyle.Regular);
-            g.DrawString("[ BARCODE / QR ]", barcodeFont, Brushes.Black, 442, 315);
-            string opSub = val.ID_Operacion.ToString();
-            if (opSub.Length > 18) opSub = opSub.Substring(0, 18);
-            g.DrawString(opSub, barcodeFont, Brushes.Black, 422, 400);
         }
     }
 }

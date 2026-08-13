@@ -47,6 +47,11 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
   const [useGrid, setUseGrid] = useState(true);
   const [showSimulatedValues, setShowSimulatedValues] = useState(true);
 
+  // Label settings
+  const [labelWidth, setLabelWidth] = useState(4); // in inches
+  const [labelHeight, setLabelHeight] = useState(3); // in inches
+  const [labelDpi, setLabelDpi] = useState(203); // 203, 300, 600
+
   // Drag state
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
@@ -150,20 +155,42 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
       const res = await fetch(`${apiBaseUrl}/api/config`);
       if (res.ok) {
         const data = await res.json();
+        const width = parseFloat(data.Printer_Label_Width_Inches) || 4;
+        const height = parseFloat(data.Printer_Label_Height_Inches) || 3;
+        const dpi = parseInt(data.Printer_Label_DPI) || 203;
+        setLabelWidth(width);
+        setLabelHeight(height);
+        setLabelDpi(dpi);
+
         const template = data.Printer_Zpl_Template || presets.standard;
         setZplCode(template);
         setOriginalZpl(template);
         // Parse raw ZPL into visual elements initially
         const elements = parseZplToElements(template);
         setVisualElements(elements);
-        fetchPreview(template, simData);
+
+        // Check for ^PW and ^LL in template to sync
+        const pwMatch = template.match(/\^PW(\d+)/i);
+        const llMatch = template.match(/\^LL(\d+)/i);
+        let finalWidth = width;
+        let finalHeight = height;
+        if (pwMatch) {
+          finalWidth = parseFloat((parseInt(pwMatch[1]) / dpi).toFixed(2));
+          setLabelWidth(finalWidth);
+        }
+        if (llMatch) {
+          finalHeight = parseFloat((parseInt(llMatch[1]) / dpi).toFixed(2));
+          setLabelHeight(finalHeight);
+        }
+
+        fetchPreview(template, simData, finalWidth, finalHeight, dpi);
       }
     } catch (e) {
       console.warn("Error cargando plantilla inicial. Usando preset estándar.", e);
       setZplCode(presets.standard);
       const elements = parseZplToElements(presets.standard);
       setVisualElements(elements);
-      fetchPreview(presets.standard, simData);
+      fetchPreview(presets.standard, simData, 4, 3, 203);
     }
   };
 
@@ -323,7 +350,9 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
 
   // GENERATOR: VisualElement[] -> ZPL String
   const generateZplFromElements = (elements: VisualElement[]): string => {
-    let zpl = '^XA\n^LH30,20\n';
+    const dotsWidth = Math.round(labelWidth * labelDpi);
+    const dotsHeight = Math.round(labelHeight * labelDpi);
+    let zpl = `^XA\n^PW${dotsWidth}\n^LL${dotsHeight}\n^LH30,20\n`;
     
     // Sort elements visually by Y, then X to write neat ZPL
     const sorted = [...elements].sort((a, b) => {
@@ -351,7 +380,13 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
     return zpl;
   };
 
-  const fetchPreview = async (templateToRender: string, dataToUse: SimulatedData) => {
+  const fetchPreview = async (
+    templateToRender: string, 
+    dataToUse: SimulatedData,
+    width = labelWidth,
+    height = labelHeight,
+    dpi = labelDpi
+  ) => {
     if (!templateToRender) return;
     setIsLoadingPreview(true);
     setPreviewError(null);
@@ -388,7 +423,10 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           zplTemplate: templateToRender,
-          validationData
+          validationData,
+          labelWidthInches: width,
+          labelHeightInches: height,
+          labelDpi: dpi
         })
       });
 
@@ -419,7 +457,8 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
         zplSimulated = zplSimulated.replace(/{QrCompleto}/g, dataToUse.qrCompleto);
         zplSimulated = zplSimulated.replace(/{FechaLectura}/g, new Date().toLocaleString());
 
-        const labelaryRes = await fetch('http://api.labelary.com/v1/printers/8dpmm/labels/6x4/0/', {
+        const dpmmStr = dpi === 300 ? '12dpmm' : dpi === 600 ? '24dpmm' : '8dpmm';
+        const labelaryRes = await fetch(`http://api.labelary.com/v1/printers/${dpmmStr}/labels/${width}x${height}/0/`, {
           method: 'POST',
           body: zplSimulated
         });
@@ -461,6 +500,16 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
       const parsed = parseZplToElements(zplCode);
       setVisualElements(parsed);
       setSelectedElementId(null);
+
+      // Parse dimensions from ZPL if present to sync inputs
+      const pwMatch = zplCode.match(/\^PW(\d+)/i);
+      const llMatch = zplCode.match(/\^LL(\d+)/i);
+      if (pwMatch) {
+        setLabelWidth(parseFloat((parseInt(pwMatch[1]) / labelDpi).toFixed(2)));
+      }
+      if (llMatch) {
+        setLabelHeight(parseFloat((parseInt(llMatch[1]) / labelDpi).toFixed(2)));
+      }
     } else {
       // Generate ZPL code from visual elements
       const generated = generateZplFromElements(visualElements);
@@ -495,9 +544,11 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
         newY = Math.round(newY / 10) * 10;
       }
 
-      // Keep within label boundaries (ZPL is standard 600 width, 450 height)
-      newX = Math.max(0, Math.min(580, newX));
-      newY = Math.max(0, Math.min(420, newY));
+      // Keep within label boundaries (dotsWidth and dotsHeight)
+      const dotsWidth = Math.round(labelWidth * labelDpi);
+      const dotsHeight = Math.round(labelHeight * labelDpi);
+      newX = Math.max(0, Math.min(dotsWidth - 20, newX));
+      newY = Math.max(0, Math.min(dotsHeight - 20, newY));
 
       setVisualElements(prev => prev.map(el => {
         if (el.id === selectedElementId) {
@@ -522,12 +573,14 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, dragStart, elementStart, selectedElementId, useGrid]);
+  }, [isDragging, dragStart, elementStart, selectedElementId, useGrid, labelWidth, labelHeight, labelDpi]);
 
   // Visual template helper methods
   const addElement = (type: VisualElement['type']) => {
     const id = 'el_' + Math.random().toString(36).substr(2, 9);
     let newElement: VisualElement;
+    const dotsWidth = Math.round(labelWidth * labelDpi);
+    const dotsHeight = Math.round(labelHeight * labelDpi);
 
     switch (type) {
       case 'text':
@@ -537,13 +590,13 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
         newElement = { id, type, x: 50, y: 150, w: 200, h: 60, content: '{Referencia}' };
         break;
       case 'qrcode':
-        newElement = { id, type, x: 400, y: 250, w: 125, h: 125, content: '{QrCompleto}', qrScale: 5 };
+        newElement = { id, type, x: Math.round(dotsWidth - 170), y: Math.round(dotsHeight - 170), w: 125, h: 125, content: '{QrCompleto}', qrScale: 5 };
         break;
       case 'box':
-        newElement = { id, type, x: 10, y: 10, w: 560, h: 410, content: 'Caja', thickness: 4 };
+        newElement = { id, type, x: 10, y: 10, w: dotsWidth - 20, h: dotsHeight - 20, content: 'Caja', thickness: 4 };
         break;
       case 'line':
-        newElement = { id, type, x: 10, y: 210, w: 560, h: 2, content: 'Línea', thickness: 2 };
+        newElement = { id, type, x: 10, y: Math.round(dotsHeight / 2), w: dotsWidth - 20, h: 2, content: 'Línea', thickness: 2 };
         break;
     }
 
@@ -604,9 +657,25 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
       });
 
       if (res.ok) {
+        await fetch(`${apiBaseUrl}/api/config`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: 'Printer_Label_Width_Inches', value: labelWidth.toString(), user: 'ADMIN_DISEÑO', motivo: 'Guardado tamaño etiqueta' })
+        });
+        await fetch(`${apiBaseUrl}/api/config`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: 'Printer_Label_Height_Inches', value: labelHeight.toString(), user: 'ADMIN_DISEÑO', motivo: 'Guardado tamaño etiqueta' })
+        });
+        await fetch(`${apiBaseUrl}/api/config`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: 'Printer_Label_DPI', value: labelDpi.toString(), user: 'ADMIN_DISEÑO', motivo: 'Guardado tamaño etiqueta' })
+        });
+
         setOriginalZpl(targetZpl);
         setZplCode(targetZpl);
-        setSaveStatus({ type: 'success', message: '¡Diseño guardado correctamente en la base de datos!' });
+        setSaveStatus({ type: 'success', message: '¡Diseño y configuración de etiqueta guardados correctamente!' });
         onConfigUpdated();
         setTimeout(() => setSaveStatus({ type: null, message: '' }), 4000);
       } else {
@@ -628,15 +697,25 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
     const targetZpl = getActiveZpl();
     try {
       // Save temporarily to run print job
+      await fetch(`${apiBaseUrl}/api/config`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: 'Printer_Zpl_Template', value: targetZpl, user: 'ADMIN_DISEÑO', motivo: 'Impresión de prueba temporal' })
+      });
+      await fetch(`${apiBaseUrl}/api/config`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: 'Printer_Label_Width_Inches', value: labelWidth.toString(), user: 'ADMIN_DISEÑO', motivo: 'Impresión de prueba temporal' })
+      });
+      await fetch(`${apiBaseUrl}/api/config`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: 'Printer_Label_Height_Inches', value: labelHeight.toString(), user: 'ADMIN_DISEÑO', motivo: 'Impresión de prueba temporal' })
+      });
       const saveOk = await fetch(`${apiBaseUrl}/api/config`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          key: 'Printer_Zpl_Template',
-          value: targetZpl,
-          user: 'ADMIN_DISEÑO',
-          motivo: 'Impresión de prueba temporal'
-        })
+        body: JSON.stringify({ key: 'Printer_Label_DPI', value: labelDpi.toString(), user: 'ADMIN_DISEÑO', motivo: 'Impresión de prueba temporal' })
       });
 
       if (!saveOk.ok) {
@@ -727,20 +806,20 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
       flexDirection: 'column',
       height: '100%',
       width: '100%',
-      backgroundColor: '#070a13',
-      color: '#fff',
-      overflow: 'hidden'
+      color: 'var(--text-primary)',
+      overflow: 'hidden',
+      padding: '16px 24px 16px 8px',
+      boxSizing: 'border-box'
     }} className="slide-up">
       
       {/* HEADER BAR */}
-      <header style={{
+      <header className="card-panel" style={{
         display: 'flex',
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '12px 24px',
-        borderBottom: '1px solid var(--border-color)',
-        backgroundColor: '#0a0d16',
+        padding: '14px 24px',
+        marginBottom: '16px',
         zIndex: 10
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -748,17 +827,17 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            width: '36px',
-            height: '36px',
-            borderRadius: '8px',
-            backgroundColor: 'rgba(59, 130, 246, 0.15)',
-            color: '#3b82f6'
+            width: '42px',
+            height: '42px',
+            borderRadius: '12px',
+            backgroundColor: 'rgba(37, 99, 235, 0.08)',
+            color: 'var(--accent-color)'
           }}>
-            <Layers size={18} />
+            <Layers size={20} />
           </div>
           <div>
-            <h1 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>Diseñador Visual de Etiquetas ZPL</h1>
-            <p style={{ margin: 0, fontSize: '11px', color: 'var(--text-secondary)' }}>
+            <h1 style={{ margin: 0, fontSize: '18px', fontWeight: 800, letterSpacing: '-0.5px' }}>Diseñador Visual de Etiquetas ZPL</h1>
+            <p style={{ margin: 0, fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>
               Cree plantillas Zebra de forma visual mediante Drag & Drop.
             </p>
           </div>
@@ -767,23 +846,24 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
         {/* Tab switcher */}
         <div style={{
           display: 'flex',
-          backgroundColor: '#000',
-          padding: '2px',
-          borderRadius: '8px',
-          border: '1px solid var(--border-color)'
+          backgroundColor: 'rgba(255, 255, 255, 0.45)',
+          padding: '3px',
+          borderRadius: '10px',
+          border: '1px solid rgba(0, 0, 0, 0.05)',
+          boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
         }}>
           <button 
             onClick={() => handleModeSwitch('visual')}
             style={{
               padding: '6px 14px',
               fontSize: '12px',
-              fontWeight: 600,
-              borderRadius: '6px',
+              fontWeight: 700,
+              borderRadius: '8px',
               border: 'none',
               cursor: 'pointer',
-              backgroundColor: editorMode === 'visual' ? '#3b82f6' : 'transparent',
-              color: '#fff',
-              transition: 'all 0.2s'
+              backgroundColor: editorMode === 'visual' ? '#0f172a' : 'transparent',
+              color: editorMode === 'visual' ? '#fff' : 'var(--text-secondary)',
+              transition: 'all 0.25s'
             }}
           >
             Diseño Visual (Lienzo)
@@ -793,13 +873,13 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
             style={{
               padding: '6px 14px',
               fontSize: '12px',
-              fontWeight: 600,
-              borderRadius: '6px',
+              fontWeight: 700,
+              borderRadius: '8px',
               border: 'none',
               cursor: 'pointer',
-              backgroundColor: editorMode === 'code' ? '#3b82f6' : 'transparent',
-              color: '#fff',
-              transition: 'all 0.2s'
+              backgroundColor: editorMode === 'code' ? '#0f172a' : 'transparent',
+              color: editorMode === 'code' ? '#fff' : 'var(--text-secondary)',
+              transition: 'all 0.25s'
             }}
           >
             Código ZPL (Raw)
@@ -808,7 +888,7 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
         
         {/* Action buttons */}
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <button onClick={onClose} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '13px' }}>
+          <button onClick={onClose} className="btn btn-secondary" style={{ padding: '8px 16px', fontSize: '13px' }}>
             Cerrar Diseñador
           </button>
           
@@ -817,7 +897,7 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
             disabled={getActiveZpl() === originalZpl}
             className="btn btn-primary" 
             style={{ 
-              padding: '6px 14px', 
+              padding: '8px 16px', 
               fontSize: '13px',
               opacity: getActiveZpl() === originalZpl ? 0.6 : 1,
               cursor: getActiveZpl() === originalZpl ? 'default' : 'pointer'
@@ -833,33 +913,34 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         
         {/* LEFT COLUMN: LIENZO (VISUAL) O TEXTAREA (CODE) */}
-        <div style={{
+        <div className="card-panel" style={{
           flex: '1.4',
-          borderRight: '1px solid var(--border-color)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
-          backgroundColor: '#0c0f19'
+          padding: 0,
+          marginRight: '16px',
+          borderRadius: '16px'
         }}>
           
           {/* Subheader: Presets */}
           <div style={{
-            padding: '10px 16px',
-            backgroundColor: '#0a0d16',
-            borderBottom: '1px solid var(--border-color)',
+            padding: '12px 16px',
+            backgroundColor: 'rgba(255, 255, 255, 0.25)',
+            borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
             gap: '8px'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Presets:</span>
+              <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)' }}>Presets:</span>
               {['standard', 'detailedQr', 'compact'].map(p => (
                 <button 
                   key={p} 
                   onClick={() => loadPreset(p as any)} 
                   className="btn btn-secondary" 
-                  style={{ padding: '3px 8px', fontSize: '11px', borderRadius: '4px' }}
+                  style={{ padding: '4px 10px', fontSize: '11px', borderRadius: '6px' }}
                 >
                   {p === 'standard' ? 'Estándar' : p === 'detailedQr' ? 'QR Detallado' : 'Compacto'}
                 </button>
@@ -868,12 +949,12 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
 
             {editorMode === 'visual' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--text-secondary)', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={useGrid} onChange={(e) => setUseGrid(e.target.checked)} />
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--text-secondary)', cursor: 'pointer', fontWeight: 600 }}>
+                  <input type="checkbox" checked={useGrid} onChange={(e) => setUseGrid(e.target.checked)} style={{ cursor: 'pointer' }} />
                   Ajustar a Rejilla (10px)
                 </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--text-secondary)', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={showSimulatedValues} onChange={(e) => setShowSimulatedValues(e.target.checked)} />
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--text-secondary)', cursor: 'pointer', fontWeight: 600 }}>
+                  <input type="checkbox" checked={showSimulatedValues} onChange={(e) => setShowSimulatedValues(e.target.checked)} style={{ cursor: 'pointer' }} />
                   Ver Valores Simulados
                 </label>
               </div>
@@ -897,154 +978,173 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
                 position: 'absolute',
                 top: '16px',
                 display: 'flex',
-                backgroundColor: 'rgba(10, 13, 22, 0.95)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '8px',
+                backgroundColor: 'rgba(255, 255, 255, 0.85)',
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
+                border: '1px solid rgba(0, 0, 0, 0.08)',
+                borderRadius: '12px',
                 padding: '4px',
                 gap: '4px',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.04)',
                 zIndex: 10
               }}>
-                <button onClick={() => addElement('text')} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <button onClick={() => addElement('text')} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', borderRadius: '8px' }}>
                   <Type size={12} /> +Texto
                 </button>
-                <button onClick={() => addElement('barcode')} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <button onClick={() => addElement('barcode')} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', borderRadius: '8px' }}>
                   <Move size={12} /> +Barras 1D
                 </button>
-                <button onClick={() => addElement('qrcode')} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <button onClick={() => addElement('qrcode')} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', borderRadius: '8px' }}>
                   <Maximize2 size={12} /> +QR 2D
                 </button>
-                <button onClick={() => addElement('box')} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <button onClick={() => addElement('box')} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', borderRadius: '8px' }}>
                   <Square size={12} /> +Borde/Caja
                 </button>
-                <button onClick={() => addElement('line')} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <button onClick={() => addElement('line')} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', borderRadius: '8px' }}>
                   <Maximize2 size={12} /> +Línea
                 </button>
               </div>
 
-              {/* CANVA WRAPPER CARD */}
-              <div 
-                ref={canvasRef}
-                style={{
-                  width: '600px',
-                  height: '450px',
-                  backgroundColor: '#ffffff',
-                  position: 'relative',
-                  boxShadow: '0 15px 40px rgba(0,0,0,0.7)',
-                  borderRadius: '4px',
-                  border: '1px solid #ddd',
-                  backgroundImage: useGrid ? 'radial-gradient(circle, #ddd 1px, transparent 1px)' : 'none',
-                  backgroundSize: '10px 10px',
-                  userSelect: 'none',
-                  overflow: 'hidden'
-                }}
-                onClick={() => setSelectedElementId(null)}
-              >
-                {/* Visual rendering of elements */}
-                {visualElements.map(el => {
-                  const isSelected = selectedElementId === el.id;
-                  
-                  // Render styles dynamically depending on type
-                  let innerNode: React.ReactNode;
-                  let elementStyle: React.CSSProperties = {
-                    position: 'absolute',
-                    left: `${el.x}px`,
-                    top: `${el.y}px`,
-                    width: `${el.w}px`,
-                    height: `${el.h}px`,
-                    boxSizing: 'border-box',
-                    cursor: 'move',
-                    display: 'flex',
-                    alignItems: 'center',
-                    border: isSelected ? '2px solid #2563eb' : '1px dashed transparent',
-                    boxShadow: isSelected ? '0 0 10px rgba(37,99,235,0.4)' : 'none',
-                    zIndex: isSelected ? 100 : 10
-                  };
+              {/* CANVA SCALING WRAPPER */}
+              <div style={{
+                width: '640px',
+                height: '480px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'hidden',
+                backgroundColor: 'rgba(0, 0, 0, 0.02)',
+                borderRadius: '16px',
+                border: '1px solid rgba(0, 0, 0, 0.05)',
+                position: 'relative'
+              }}>
+                {/* CANVA WRAPPER CARD */}
+                <div 
+                  ref={canvasRef}
+                  style={{
+                    width: `${Math.round(labelWidth * labelDpi)}px`,
+                    height: `${Math.round(labelHeight * labelDpi)}px`,
+                    transform: `scale(${Math.min(620 / Math.round(labelWidth * labelDpi), 460 / Math.round(labelHeight * labelDpi), 1)})`,
+                    transformOrigin: 'center center',
+                    flexShrink: 0,
+                    backgroundColor: '#ffffff',
+                    position: 'relative',
+                    boxShadow: '0 12px 32px rgba(0, 0, 0, 0.08)',
+                    borderRadius: '12px',
+                    border: '1px solid rgba(0, 0, 0, 0.1)',
+                    backgroundImage: useGrid ? 'radial-gradient(circle, rgba(0, 0, 0, 0.08) 1px, transparent 1px)' : 'none',
+                    backgroundSize: '10px 10px',
+                    userSelect: 'none',
+                    overflow: 'hidden'
+                  }}
+                  onClick={() => setSelectedElementId(null)}
+                >
+                  {/* Visual rendering of elements */}
+                  {visualElements.map(el => {
+                    const isSelected = selectedElementId === el.id;
+                    
+                    // Render styles dynamically depending on type
+                    let innerNode: React.ReactNode;
+                    let elementStyle: React.CSSProperties = {
+                      position: 'absolute',
+                      left: `${el.x}px`,
+                      top: `${el.y}px`,
+                      width: `${el.w}px`,
+                      height: `${el.h}px`,
+                      boxSizing: 'border-box',
+                      cursor: 'move',
+                      display: 'flex',
+                      alignItems: 'center',
+                      border: isSelected ? '2px solid #2563eb' : '1px dashed transparent',
+                      boxShadow: isSelected ? '0 0 10px rgba(37,99,235,0.4)' : 'none',
+                      zIndex: isSelected ? 100 : 10
+                    };
 
-                  if (el.type === 'text') {
-                    innerNode = (
-                      <span style={{ 
-                        fontSize: `${el.fontSize || 24}px`, 
-                        fontFamily: 'monospace', 
-                        fontWeight: 'bold',
-                        color: '#000',
-                        whiteSpace: 'nowrap',
-                        lineHeight: 1
-                      }}>
-                        {getSimulatedText(el.content)}
-                      </span>
-                    );
-                  } else if (el.type === 'barcode') {
-                    innerNode = (
-                      <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', justifyContent: 'space-between', padding: '2px' }}>
-                        <div style={{ 
-                          flex: 1, 
-                          width: '100%', 
-                          background: 'repeating-linear-gradient(90deg, #000, #000 3px, #fff 3px, #fff 7px)' 
-                        }} />
-                        <span style={{ fontSize: '9px', color: '#000', fontFamily: 'monospace', textAlign: 'center', fontWeight: 'bold' }}>
+                    if (el.type === 'text') {
+                      innerNode = (
+                        <span style={{ 
+                          fontSize: `${el.fontSize || 24}px`, 
+                          fontFamily: 'monospace', 
+                          fontWeight: 'bold',
+                          color: '#000',
+                          whiteSpace: 'nowrap',
+                          lineHeight: 1
+                        }}>
                           {getSimulatedText(el.content)}
                         </span>
-                      </div>
-                    );
-                  } else if (el.type === 'qrcode') {
-                    innerNode = (
-                      <div style={{ 
-                        width: '100%', 
-                        height: '100%', 
-                        border: '4px solid #000',
-                        backgroundColor: '#fff',
-                        boxSizing: 'border-box',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#000',
-                        fontFamily: 'monospace',
-                        fontWeight: 'bold',
-                        fontSize: '9px',
-                        overflow: 'hidden'
-                      }}>
-                        <span>QR CODE</span>
-                        <span style={{ fontSize: '7px', color: '#666' }}>({el.qrScale}x)</span>
-                      </div>
-                    );
-                  } else if (el.type === 'box') {
-                    elementStyle.border = `${el.thickness || 2}px solid #000`;
-                    innerNode = null;
-                  } else if (el.type === 'line') {
-                    elementStyle.backgroundColor = '#000';
-                    elementStyle.border = 'none';
-                    innerNode = null;
-                  }
+                      );
+                    } else if (el.type === 'barcode') {
+                      innerNode = (
+                        <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', justifyContent: 'space-between', padding: '2px' }}>
+                          <div style={{ 
+                            flex: 1, 
+                            width: '100%', 
+                            background: 'repeating-linear-gradient(90deg, #000, #000 3px, #fff 3px, #fff 7px)' 
+                          }} />
+                          <span style={{ fontSize: '9px', color: '#000', fontFamily: 'monospace', textAlign: 'center', fontWeight: 'bold' }}>
+                            {getSimulatedText(el.content)}
+                          </span>
+                        </div>
+                      );
+                    } else if (el.type === 'qrcode') {
+                      innerNode = (
+                        <div style={{ 
+                          width: '100%', 
+                          height: '100%', 
+                          border: '4px solid #000',
+                          backgroundColor: '#fff',
+                          boxSizing: 'border-box',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#000',
+                          fontFamily: 'monospace',
+                          fontWeight: 'bold',
+                          fontSize: '9px',
+                          overflow: 'hidden'
+                        }}>
+                          <span>QR CODE</span>
+                          <span style={{ fontSize: '7px', color: '#666' }}>({el.qrScale}x)</span>
+                        </div>
+                      );
+                    } else if (el.type === 'box') {
+                      elementStyle.border = `${el.thickness || 2}px solid #000`;
+                      innerNode = null;
+                    } else if (el.type === 'line') {
+                      elementStyle.backgroundColor = '#000';
+                      elementStyle.border = 'none';
+                      innerNode = null;
+                    }
 
-                  return (
-                    <div 
-                      key={el.id}
-                      style={elementStyle}
-                      onMouseDown={(e) => handleElementMouseDown(e, el)}
-                      onClick={(e) => e.stopPropagation()}
-                      onMouseEnter={(e) => {
-                        if (!isSelected) e.currentTarget.style.borderColor = '#999';
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isSelected) e.currentTarget.style.borderColor = 'transparent';
-                      }}
-                    >
-                      {innerNode}
-                      
-                      {/* Element corner labels when selected */}
-                      {isSelected && (
-                        <>
-                          <div style={{ position: 'absolute', top: '-4px', left: '-4px', width: '8px', height: '8px', background: '#2563eb', borderRadius: '50%' }} />
-                          <div style={{ position: 'absolute', top: '-4px', right: '-4px', width: '8px', height: '8px', background: '#2563eb', borderRadius: '50%' }} />
-                          <div style={{ position: 'absolute', bottom: '-4px', left: '-4px', width: '8px', height: '8px', background: '#2563eb', borderRadius: '50%' }} />
-                          <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', width: '8px', height: '8px', background: '#2563eb', borderRadius: '50%' }} />
-                        </>
-                      )}
-                    </div>
-                  );
-                })}
+                    return (
+                      <div 
+                        key={el.id}
+                        style={elementStyle}
+                        onMouseDown={(e) => handleElementMouseDown(e, el)}
+                        onClick={(e) => e.stopPropagation()}
+                        onMouseEnter={(e) => {
+                          if (!isSelected) e.currentTarget.style.borderColor = '#999';
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isSelected) e.currentTarget.style.borderColor = 'transparent';
+                        }}
+                      >
+                        {innerNode}
+                        
+                        {/* Element corner labels when selected */}
+                        {isSelected && (
+                          <>
+                            <div style={{ position: 'absolute', top: '-4px', left: '-4px', width: '8px', height: '8px', background: '#2563eb', borderRadius: '50%' }} />
+                            <div style={{ position: 'absolute', top: '-4px', right: '-4px', width: '8px', height: '8px', background: '#2563eb', borderRadius: '50%' }} />
+                            <div style={{ position: 'absolute', bottom: '-4px', left: '-4px', width: '8px', height: '8px', background: '#2563eb', borderRadius: '50%' }} />
+                            <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', width: '8px', height: '8px', background: '#2563eb', borderRadius: '50%' }} />
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           )}
@@ -1054,14 +1154,14 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
               <div style={{
                 padding: '8px 16px',
-                backgroundColor: '#0c101d',
-                borderBottom: '1px solid var(--border-color)',
+                backgroundColor: 'rgba(255, 255, 255, 0.25)',
+                borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
                 overflowX: 'auto'
               }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: '#f59e0b', marginRight: '6px' }}>Insertar Variable:</span>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: '#b45309', marginRight: '6px' }}>Insertar Variable:</span>
                 {['Puesto', 'Referencia', 'Ornamento', 'OrdenProduccion', 'OrdenCliente', 'Secuencia', 'SD', 'Mano', 'MinutosCurado', 'QrCompleto', 'FechaLectura'].map(v => (
                   <button 
                     key={v}
@@ -1069,11 +1169,12 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
                     style={{
                       padding: '3px 6px',
                       fontSize: '11px',
-                      background: 'rgba(255,255,255,0.04)',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: '4px',
-                      color: '#fff',
-                      cursor: 'pointer'
+                      background: 'rgba(255, 255, 255, 0.5)',
+                      border: '1px solid rgba(0,0,0,0.06)',
+                      borderRadius: '6px',
+                      color: 'var(--text-primary)',
+                      cursor: 'pointer',
+                      fontWeight: 600
                     }}
                   >
                     &#123;{v}&#125;
@@ -1090,14 +1191,15 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
                   margin: 0,
                   padding: '20px',
                   border: 'none',
-                  backgroundColor: '#04070e',
-                  color: '#10b981',
+                  backgroundColor: 'rgba(255, 255, 255, 0.65)',
+                  color: '#09326c',
                   fontFamily: 'Fira Code, Consolas, Monaco, Courier New, monospace',
                   fontSize: '13px',
                   lineHeight: '1.6',
                   resize: 'none',
                   outline: 'none',
-                  boxSizing: 'border-box'
+                  boxSizing: 'border-box',
+                  borderTop: '1px solid rgba(0, 0, 0, 0.05)'
                 }}
                 placeholder="Escriba código ZPL..."
               />
@@ -1106,26 +1208,80 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
         </div>
 
         {/* RIGHT COLUMN: ELEMENT PROPERTIES, PREVIEW AND TEST PANEL */}
-        <div style={{
+        <div className="card-panel" style={{
           flex: '1',
           display: 'flex',
           flexDirection: 'column',
-          backgroundColor: '#090c14',
           overflowY: 'auto',
           padding: '20px',
           gap: '20px',
-          boxSizing: 'border-box'
+          boxSizing: 'border-box',
+          borderRadius: '16px'
         }}>
           
+          {/* 0. CONFIGURACIÓN DE LA ETIQUETA */}
+          <div className="card-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(255,255,255,0.5)', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.05)' }}>
+            <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-primary)' }}>
+              Configuración de Etiqueta
+            </h3>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label style={{ fontSize: '10px', marginBottom: '2px' }}>Ancho (pulgadas):</label>
+                <input 
+                  type="number" 
+                  step="0.1"
+                  min="1"
+                  max="10"
+                  className="form-input" 
+                  style={{ padding: '6px 10px', fontSize: '12px' }}
+                  value={labelWidth} 
+                  onChange={(e) => setLabelWidth(parseFloat(e.target.value) || 4)} 
+                />
+              </div>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label style={{ fontSize: '10px', marginBottom: '2px' }}>Alto (pulgadas):</label>
+                <input 
+                  type="number" 
+                  step="0.1"
+                  min="1"
+                  max="10"
+                  className="form-input" 
+                  style={{ padding: '6px 10px', fontSize: '12px' }}
+                  value={labelHeight} 
+                  onChange={(e) => setLabelHeight(parseFloat(e.target.value) || 3)} 
+                />
+              </div>
+            </div>
+
+            <div className="form-group" style={{ margin: 0 }}>
+              <label style={{ fontSize: '10px', marginBottom: '2px' }}>Resolución (DPI):</label>
+              <select
+                className="form-input"
+                style={{ padding: '6px 10px', fontSize: '12px' }}
+                value={labelDpi}
+                onChange={(e) => setLabelDpi(parseInt(e.target.value) || 203)}
+              >
+                <option value="203">203 DPI (8 dpmm)</option>
+                <option value="300">300 DPI (12 dpmm)</option>
+                <option value="600">600 DPI (24 dpmm)</option>
+              </select>
+            </div>
+            
+            <div style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: 600 }}>
+              Resolución de Lienzo: {Math.round(labelWidth * labelDpi)} x {Math.round(labelHeight * labelDpi)} px (puntos ZPL)
+            </div>
+          </div>
+
           {/* 1. SELECTED ELEMENT PROPERTIES (Only visible in Visual mode) */}
           {editorMode === 'visual' && (
-            <div className="card-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--accent-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="card-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(255,255,255,0.5)', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.05)' }}>
+              <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 800, textTransform: 'uppercase', color: 'var(--accent-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>Propiedades del Elemento</span>
                 {selectedElement && (
                   <button 
                     onClick={() => deleteElement(selectedElement.id)}
-                    style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px' }}
+                    style={{ background: 'transparent', border: 'none', color: '#dc2626', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 700 }}
                   >
                     <Trash2 size={12} /> Eliminar
                   </button>
@@ -1190,7 +1346,7 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
                       <label style={{ fontSize: '10px', marginBottom: '2px' }}>Tamaño de Fuente:</label>
                       <select
                         className="form-input"
-                        style={{ padding: '6px 10px', fontSize: '12px', background: '#000' }}
+                        style={{ padding: '6px 10px', fontSize: '12px' }}
                         value={selectedElement.fontSize || 24}
                         onChange={(e) => updateSelectedElement({ fontSize: parseInt(e.target.value) })}
                       >
@@ -1248,13 +1404,14 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
                             key={v}
                             onClick={() => updateSelectedElement({ content: `{${v}}` })}
                             style={{
-                              padding: '2px 6px',
+                              padding: '3px 8px',
                               fontSize: '10px',
-                              background: '#1e293b',
+                              background: 'rgba(37, 99, 235, 0.08)',
                               border: 'none',
-                              borderRadius: '4px',
+                              borderRadius: '6px',
                               cursor: 'pointer',
-                              color: '#93c5fd'
+                              color: 'var(--accent-color)',
+                              fontWeight: 700
                             }}
                           >
                             {v}
@@ -1266,7 +1423,7 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
 
                 </div>
               ) : (
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontStyle: 'italic', textAlign: 'center', padding: '10px 0' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontStyle: 'italic', textAlign: 'center', padding: '10px 0', fontWeight: 600 }}>
                   Seleccione un elemento del lienzo para editar sus propiedades.
                 </div>
               )}
@@ -1276,7 +1433,7 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
           {/* 2. RENDERED PREVIEW IMAGE BLOCK */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' }}>
+              <span style={{ fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' }}>
                 Vista Previa del Renderizado
               </span>
               
@@ -1284,7 +1441,7 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
                 onClick={() => fetchPreview(getActiveZpl(), simData)}
                 disabled={isLoadingPreview}
                 className="btn btn-secondary"
-                style={{ padding: '4px 10px', fontSize: '11px', borderRadius: '4px' }}
+                style={{ padding: '4px 10px', fontSize: '11px', borderRadius: '6px' }}
               >
                 <RefreshCw size={10} className={isLoadingPreview ? 'pulse' : ''} />
                 Actualizar Render
@@ -1292,8 +1449,8 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
             </div>
 
             <div style={{
-              background: '#111827',
-              borderRadius: '8px',
+              background: 'rgba(0, 0, 0, 0.03)',
+              borderRadius: '12px',
               border: '1px solid var(--border-color)',
               minHeight: '220px',
               display: 'flex',
@@ -1301,31 +1458,31 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
               justifyContent: 'center',
               position: 'relative',
               padding: '12px',
-              boxShadow: 'inset 0 2px 6px rgba(0,0,0,0.8)'
+              boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.05)'
             }}>
               {isLoadingPreview ? (
-                <div className="pulse" style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Generando preview ZPL...</div>
+                <div className="pulse" style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600 }}>Generando preview ZPL...</div>
               ) : previewError ? (
                 <div style={{ textAlign: 'center', padding: '12px' }}>
-                  <AlertTriangle size={24} style={{ color: '#f59e0b', marginBottom: '4px' }} />
-                  <div style={{ fontSize: '11px', color: '#ef4444' }}>{previewError}</div>
+                  <AlertTriangle size={24} style={{ color: '#d97706', marginBottom: '4px' }} />
+                  <div style={{ fontSize: '11px', color: '#dc2626', fontWeight: 700 }}>{previewError}</div>
                 </div>
               ) : previewImage ? (
                 <img 
                   src={`data:image/png;base64,${previewImage}`} 
                   alt="Zebra Rendered Label" 
-                  style={{ display: 'block', maxWidth: '100%', maxHeight: '200px', objectFit: 'contain', backgroundColor: '#fff', borderRadius: '2px', padding: '4px' }} 
+                  style={{ display: 'block', maxWidth: '100%', maxHeight: '200px', objectFit: 'contain', backgroundColor: '#fff', borderRadius: '4px', padding: '8px', border: '1px solid rgba(0, 0, 0, 0.05)', boxShadow: '0 4px 12px rgba(0,0,0,0.04)' }} 
                 />
               ) : (
-                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Cargando preview...</span>
+                <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600 }}>Cargando preview...</span>
               )}
             </div>
           </div>
 
           {/* 3. SIMULATED VARIABLES DATA */}
-          <div className="card-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Sparkles size={14} style={{ color: '#f59e0b' }} />
+          <div className="card-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(255,255,255,0.5)', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.05)' }}>
+            <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px', textTransform: 'uppercase', color: 'var(--text-primary)' }}>
+              <Sparkles size={14} style={{ color: '#d97706' }} />
               Simulación de Datos
             </h3>
             
@@ -1374,8 +1531,8 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
           </div>
 
           {/* 4. PHYSICAL PRINTER TEST */}
-          <div className="card-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div className="card-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(255,255,255,0.5)', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.05)' }}>
+            <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px', textTransform: 'uppercase', color: 'var(--text-primary)' }}>
               <Printer size={14} style={{ color: 'var(--accent-color)' }} />
               Prueba de Impresión Física
             </h3>
@@ -1386,14 +1543,14 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
                   value={selectedPrinter} 
                   onChange={(e) => setSelectedPrinter(e.target.value)}
                   className="form-input"
-                  style={{ padding: '6px 10px', fontSize: '12px', background: '#000' }}
+                  style={{ padding: '6px 10px', fontSize: '12px' }}
                 >
                   {printers.map(p => (
                     <option key={p} value={p}>{p}</option>
                   ))}
                 </select>
               ) : (
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontStyle: 'italic', fontWeight: 600 }}>
                   No se encontraron impresoras en Windows.
                 </div>
               )}
@@ -1402,7 +1559,7 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
                 onClick={handleTestPrint}
                 disabled={printers.length === 0}
                 className="btn btn-secondary"
-                style={{ padding: '8px 12px', fontSize: '12px', width: '100%' }}
+                style={{ padding: '8px 12px', fontSize: '12px', width: '100%', borderRadius: '8px' }}
               >
                 <Printer size={12} />
                 Imprimir Etiqueta de Prueba
@@ -1410,15 +1567,16 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
 
               {printStatus.message && (
                 <div style={{
-                  padding: '6px 10px',
-                  borderRadius: '4px',
+                  padding: '8px 12px',
+                  borderRadius: '8px',
                   fontSize: '11px',
-                  backgroundColor: printStatus.type === 'success' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(220, 38, 38, 0.15)',
-                  border: '1px solid ' + (printStatus.type === 'success' ? '#10b981' : '#ef4444'),
-                  color: printStatus.type === 'success' ? '#10b981' : '#ef4444',
+                  backgroundColor: printStatus.type === 'success' ? 'rgba(5, 150, 105, 0.05)' : 'rgba(220, 38, 38, 0.05)',
+                  border: '1px solid ' + (printStatus.type === 'success' ? '#059669' : '#dc2626'),
+                  color: printStatus.type === 'success' ? '#059669' : '#dc2626',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px'
+                  gap: '6px',
+                  fontWeight: 700
                 }}>
                   <span>{printStatus.message}</span>
                 </div>
@@ -1437,18 +1595,18 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
           bottom: '24px',
           left: '24px',
           padding: '12px 20px',
-          borderRadius: '8px',
-          backgroundColor: saveStatus.type === 'success' ? '#10b981' : '#ef4444',
+          borderRadius: '10px',
+          backgroundColor: saveStatus.type === 'success' ? '#059669' : '#dc2626',
           color: '#fff',
           display: 'flex',
           alignItems: 'center',
           gap: '8px',
-          boxShadow: '0 4px 15px rgba(0,0,0,0.5)',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
           animation: 'slideUp 0.2s ease-out',
           zIndex: 1000
         }}>
           <CheckCircle2 size={16} />
-          <span style={{ fontSize: '12px', fontWeight: 600 }}>{saveStatus.message}</span>
+          <span style={{ fontSize: '12px', fontWeight: 700 }}>{saveStatus.message}</span>
         </div>
       )}
 

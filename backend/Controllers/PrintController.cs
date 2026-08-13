@@ -83,7 +83,13 @@ namespace Backend.Controllers
 
             try
             {
-                string base64Preview = await _printer.GeneratePreviewAsync(request.ZplTemplate, request.ValidationData);
+                string base64Preview = await _printer.GeneratePreviewAsync(
+                    request.ZplTemplate, 
+                    request.ValidationData, 
+                    request.LabelWidthInches, 
+                    request.LabelHeightInches, 
+                    request.LabelDpi
+                );
                 return Ok(new { preview = base64Preview });
             }
             catch (Exception ex)
@@ -97,5 +103,8 @@ namespace Backend.Controllers
     {
         public string ZplTemplate { get; set; } = string.Empty;
         public Validacion ValidationData { get; set; } = new Validacion();
+        public double? LabelWidthInches { get; set; }
+        public double? LabelHeightInches { get; set; }
+        public int? LabelDpi { get; set; }
     }
 }

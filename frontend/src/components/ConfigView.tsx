@@ -479,11 +479,13 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ apiBaseUrl, onClose, onC
   if (!isAuthenticated) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', width: '100%' }}>
-        <form onSubmit={handleLogin} className="card-panel slide-up" style={{ width: '400px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <form onSubmit={handleLogin} className="card-panel slide-up" style={{ width: '400px', display: 'flex', flexDirection: 'column', gap: '20px', borderRadius: '16px' }}>
           <div style={{ textAlign: 'center' }}>
-            <KeyRound size={48} style={{ color: 'var(--accent-color)', marginBottom: '12px' }} />
-            <h2 style={{ margin: 0, fontSize: '20px' }}>Acceso Supervisado Protegido</h2>
-            <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Ingrese la contraseña de supervisor para editar configuraciones</span>
+            <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '56px', height: '56px', borderRadius: '16px', background: 'rgba(37, 99, 235, 0.08)', marginBottom: '12px' }}>
+              <KeyRound size={32} style={{ color: 'var(--accent-color)' }} />
+            </div>
+            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>Acceso Supervisado Protegido</h2>
+            <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)' }}>Ingrese la contraseña de supervisor para editar configuraciones</span>
           </div>
 
           <div className="form-group" style={{ margin: 0 }}>
@@ -498,7 +500,7 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ apiBaseUrl, onClose, onC
             />
           </div>
 
-          {authError && <div style={{ color: '#f87171', fontSize: '13px', textAlign: 'center' }}>{authError}</div>}
+          {authError && <div style={{ color: '#dc2626', fontSize: '13px', textAlign: 'center', fontWeight: 700 }}>{authError}</div>}
 
           <div style={{ display: 'flex', gap: '12px' }}>
             <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={onClose}>Cancelar</button>
@@ -510,15 +512,17 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ apiBaseUrl, onClose, onC
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '16px', boxSizing: 'border-box', overflowY: 'auto' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '16px 24px 16px 8px', boxSizing: 'border-box', overflowY: 'auto' }}>
       
       {/* HEADER SECTION */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px', marginBottom: '16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(0,0,0,0.05)', paddingBottom: '16px', marginBottom: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <Settings size={28} style={{ color: 'var(--accent-color)' }} />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '42px', height: '42px', borderRadius: '12px', background: 'rgba(37, 99, 235, 0.08)' }}>
+            <Settings size={24} style={{ color: 'var(--accent-color)' }} />
+          </div>
           <div>
-            <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 800 }}>Panel de Administración de Planta</h2>
-            <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Configuraciones globales, equivalencias de panel y herramientas de análisis QR</span>
+            <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 800, letterSpacing: '-0.5px' }}>Panel de Administración de Planta</h2>
+            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Configuraciones globales, equivalencias de panel y herramientas de análisis QR</span>
           </div>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
@@ -534,9 +538,9 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ apiBaseUrl, onClose, onC
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
           {/* CONEXIÓN A BASE DE DATOS SQL SERVER */}
-          <section className="card-panel" style={{ borderLeft: '4px solid #2563eb' }}>
-            <h3 style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#3b82f6', textTransform: 'uppercase', letterSpacing: '1px' }}>🖥️ Conexión SQL Server</h3>
-            <span style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+          <section className="card-panel" style={{ borderLeft: '4px solid var(--accent-color)' }}>
+            <h3 style={{ margin: '0 0 12px 0', fontSize: '15px', color: 'var(--accent-color)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 800 }}>🖥️ Conexión SQL Server</h3>
+            <span style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px', fontWeight: 500 }}>
               Configure la cadena de conexión de SQL Server de forma dinámica. La aplicación probará y guardará el acceso localmente en connection.json.
             </span>
             <div className="form-group" style={{ margin: 0 }}>
@@ -556,8 +560,8 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ apiBaseUrl, onClose, onC
               <div style={{ 
                 marginTop: '12px', 
                 fontSize: '13px', 
-                fontWeight: 600, 
-                color: testConnSuccess === true ? '#10b981' : testConnSuccess === false ? '#ef4444' : '#f59e0b'
+                fontWeight: 700, 
+                color: testConnSuccess === true ? '#059669' : testConnSuccess === false ? '#dc2626' : '#d97706'
               }}>
                 {testConnMessage}
               </div>
@@ -568,7 +572,6 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ apiBaseUrl, onClose, onC
                 className="btn btn-primary" 
                 onClick={handleTestAndSaveConnection} 
                 disabled={isTestingConn}
-                style={{ backgroundColor: '#2563eb' }}
               >
                 {isTestingConn ? 'Probando...' : 'Probar y Guardar Conexión'}
               </button>
@@ -577,7 +580,7 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ apiBaseUrl, onClose, onC
 
           {/* GENERAL CONFIGURATION SETTINGS */}
           <section className="card-panel">
-            <h3 style={{ margin: '0 0 16px 0', fontSize: '15px', color: 'var(--accent-color)', textTransform: 'uppercase', letterSpacing: '1px' }}>⚙️ Configuración del Puesto</h3>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '15px', color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 800 }}>⚙️ Configuración del Puesto</h3>
             
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div className="form-group">
@@ -646,9 +649,9 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ apiBaseUrl, onClose, onC
                   id="simulatorCheck" 
                   checked={simulatorEnabled} 
                   onChange={(e) => setSimulatorEnabled(e.target.checked)} 
-                  style={{ width: '18px', height: '18px' }} 
+                  style={{ width: '18px', height: '18px', cursor: 'pointer' }} 
                 />
-                <label htmlFor="simulatorCheck" style={{ margin: 0, color: '#f59e0b', cursor: 'pointer', fontWeight: 600 }}>
+                <label htmlFor="simulatorCheck" style={{ margin: 0, color: '#b45309', cursor: 'pointer', fontWeight: 600 }}>
                   Activar Simulador de Impresión Virtual (Guarda archivos PNG locales en PrintedLabels en vez de imprimir)
                 </label>
               </div>
@@ -658,7 +661,7 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ apiBaseUrl, onClose, onC
                   id="showQrSimulatorCheck" 
                   checked={showQrSimulator} 
                   onChange={(e) => setShowQrSimulator(e.target.checked)} 
-                  style={{ width: '18px', height: '18px' }} 
+                  style={{ width: '18px', height: '18px', cursor: 'pointer' }} 
                 />
                 <label htmlFor="showQrSimulatorCheck" style={{ margin: 0, color: 'var(--accent-color)', cursor: 'pointer', fontWeight: 600 }}>
                   Mostrar Panel de Simulación QR en la pantalla operativa de Planta (Demo)
@@ -666,8 +669,8 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ apiBaseUrl, onClose, onC
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
-              <span style={{ fontSize: '13px', color: '#10b981', fontWeight: 600 }}>{saveMessage}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: '16px' }}>
+              <span style={{ fontSize: '13px', color: '#059669', fontWeight: 700 }}>{saveMessage}</span>
               <button className="btn btn-primary" onClick={handleSaveAllGeneral}>
                 <Save size={16} />
                 Guardar Configuración
@@ -678,7 +681,7 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ apiBaseUrl, onClose, onC
           {/* EQUIVALENCES TABLE EDITING */}
           <section className="card-panel">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ margin: 0, fontSize: '15px', color: 'var(--accent-color)', textTransform: 'uppercase', letterSpacing: '1px' }}>📋 Equivalencias Panel - Ornamento</h3>
+              <h3 style={{ margin: 0, fontSize: '15px', color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 800 }}>📋 Equivalencias Panel - Ornamento</h3>
               <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => setEditingEquiv({ codigoPanel: '', codigoOrnamento: '', requiereOrnamento: true })}>
                 <Plus size={14} /> Nueva Equivalencia
               </button>
@@ -686,8 +689,8 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ apiBaseUrl, onClose, onC
 
             {/* Edit/Add Form Overlay */}
             {editingEquiv && (
-              <form onSubmit={handleSaveEquivalence} style={{ marginBottom: '20px', padding: '16px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
-                <strong style={{ fontSize: '13px', display: 'block', marginBottom: '12px' }}>
+              <form onSubmit={handleSaveEquivalence} style={{ marginBottom: '20px', padding: '16px', background: 'rgba(255,255,255,0.5)', border: '1px solid rgba(0,0,0,0.05)', borderRadius: '12px' }}>
+                <strong style={{ fontSize: '13px', display: 'block', marginBottom: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>
                   {editingEquiv.id_Equivalencia ? 'Editar Equivalencia' : 'Agregar Nueva Equivalencia'}
                 </strong>
                 
@@ -720,12 +723,13 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ apiBaseUrl, onClose, onC
                       id="equivRequiresOrn" 
                       checked={editingEquiv.requiereOrnamento ?? true} 
                       onChange={(e) => setEditingEquiv({ ...editingEquiv, requiereOrnamento: e.target.checked })} 
+                      style={{ cursor: 'pointer' }}
                     />
-                    <label htmlFor="equivRequiresOrn" style={{ margin: 0, cursor: 'pointer' }}>Requiere lectura de ornamento y curado</label>
+                    <label htmlFor="equivRequiresOrn" style={{ margin: 0, cursor: 'pointer', fontWeight: 600 }}>Requiere lectura de ornamento y curado</label>
                   </div>
                 </div>
 
-                {equivError && <div style={{ color: '#f87171', fontSize: '12px', marginBottom: '8px' }}>{equivError}</div>}
+                {equivError && <div style={{ color: '#dc2626', fontSize: '12px', marginBottom: '8px', fontWeight: 600 }}>{equivError}</div>}
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                   <button type="button" className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => setEditingEquiv(null)}>Cancelar</button>
@@ -748,8 +752,8 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ apiBaseUrl, onClose, onC
                   {equivalences.filter(e => e.activo).map((equiv) => (
                     <tr key={equiv.id_Equivalencia}>
                       <td><strong>{equiv.codigoPanel}</strong></td>
-                      <td>{equiv.codigoOrnamento || <span style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>SIN ORNAMENTO</span>}</td>
-                      <td>{equiv.requiereOrnamento ? 'Sí' : 'No'}</td>
+                      <td>{equiv.codigoOrnamento || <span style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: 600 }}>SIN ORNAMENTO</span>}</td>
+                      <td style={{ fontWeight: 600 }}>{equiv.requiereOrnamento ? 'Sí' : 'No'}</td>
                       <td style={{ textAlign: 'right' }}>
                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                           <button className="btn btn-secondary" style={{ padding: '4px 8px' }} onClick={() => setEditingEquiv(equiv)}>
@@ -774,7 +778,7 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ apiBaseUrl, onClose, onC
           
           {/* QR PARSER CONFIGURATION */}
           <section className="card-panel">
-            <h3 style={{ margin: '0 0 16px 0', fontSize: '15px', color: 'var(--accent-color)', textTransform: 'uppercase', letterSpacing: '1px' }}>📐 Configuración de Formato QR</h3>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '15px', color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 800 }}>📐 Configuración de Formato QR</h3>
             
             <div className="form-group">
               <label>Tipo de Parseo:</label>
@@ -857,9 +861,9 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ apiBaseUrl, onClose, onC
           </section>
 
           {/* INTERACTIVE QR PREVIEW TESTING TOOL */}
-          <section className="card-panel" style={{ border: '1px solid rgba(59,130,246,0.3)' }}>
-            <h3 style={{ margin: '0 0 12px 0', fontSize: '15px', color: 'var(--accent-color)', textTransform: 'uppercase' }}>🧪 Herramienta de Prueba de Parser</h3>
-            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: '0 0 12px 0' }}>Pegue un código QR y presione 'Probar Parseo' para verificar que la configuración sea correcta antes de guardar.</p>
+          <section className="card-panel" style={{ border: '1px solid rgba(37, 99, 235, 0.2)' }}>
+            <h3 style={{ margin: '0 0 12px 0', fontSize: '15px', color: 'var(--accent-color)', textTransform: 'uppercase', fontWeight: 800 }}>🧪 Herramienta de Prueba de Parser</h3>
+            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: '0 0 12px 0', fontWeight: 500 }}>Pegue un código QR y presione 'Probar Parseo' para verificar que la configuración sea correcta antes de guardar.</p>
 
             <div className="form-group">
               <label>Pegar QR para Prueba:</label>
@@ -878,28 +882,28 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ apiBaseUrl, onClose, onC
             </button>
 
             {testError && (
-              <div style={{ padding: '10px', background: 'rgba(220,38,38,0.1)', border: '1px solid rgba(220,38,38,0.3)', color: '#f87171', borderRadius: '6px', fontSize: '12px' }}>
+              <div style={{ padding: '10px', background: 'rgba(220,38,38,0.05)', border: '1px solid rgba(220,38,38,0.15)', color: '#dc2626', borderRadius: '10px', fontSize: '12px', fontWeight: 600 }}>
                 ❌ {testError}
               </div>
             )}
 
             {testResult && (
-              <div className="slide-up" style={{ padding: '12px', background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '6px', fontSize: '12px' }}>
-                <div style={{ color: '#10b981', fontWeight: 700, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div className="slide-up" style={{ padding: '12px', background: 'rgba(5,150,129,0.04)', border: '1px solid rgba(5,150,129,0.15)', borderRadius: '10px', fontSize: '12px' }}>
+                <div style={{ color: '#059669', fontWeight: 800, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <CheckCircle2 size={16} />
                   <span>PARSEO COMPLETO CORRECTO</span>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '6px' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>Ornamento:</span>
-                  <strong>{testResult.ornament}</strong>
-                  <span style={{ color: 'var(--text-secondary)' }}>Fecha Raw:</span>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Ornamento:</span>
+                  <strong style={{ color: 'var(--text-primary)' }}>{testResult.ornament}</strong>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Fecha Raw:</span>
                   <code>{testResult.rawDatetime}</code>
-                  <span style={{ color: 'var(--text-secondary)' }}>Fecha Interpretada:</span>
-                  <strong>{testResult.parsedDatetime}</strong>
-                  <span style={{ color: 'var(--text-secondary)' }}>Serie:</span>
-                  <span>{testResult.serial}</span>
-                  <span style={{ color: 'var(--text-secondary)' }}>Horas Curado:</span>
-                  <strong style={{ color: parseFloat(testResult.curingHours) >= parseFloat(minCuringHours) ? '#10b981' : '#f87171' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Fecha Interpretada:</span>
+                  <strong style={{ color: 'var(--text-primary)' }}>{testResult.parsedDatetime}</strong>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Serie:</span>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{testResult.serial}</span>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Horas Curado:</span>
+                  <strong style={{ color: parseFloat(testResult.curingHours) >= parseFloat(minCuringHours) ? '#059669' : '#dc2626' }}>
                     {testResult.curingHours ? `${testResult.curingHours} horas` : 'N/A'}
                   </strong>
                 </div>
@@ -909,24 +913,24 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ apiBaseUrl, onClose, onC
 
           {/* AUDIT LOG TRAIL */}
           <section className="card-panel" style={{ maxHeight: '200px', overflowY: 'auto' }}>
-            <h3 style={{ margin: '0 0 12px 0', fontSize: '13px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>📜 Historial de Cambios de Configuración</h3>
+            <h3 style={{ margin: '0 0 12px 0', fontSize: '13px', color: 'var(--text-primary)', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.5px' }}>📜 Historial de Cambios</h3>
             {auditLogs.length > 0 ? (
               <div style={{ fontSize: '12px' }}>
                 {auditLogs.map((log) => (
-                  <div key={log.id_Auditoria} style={{ borderBottom: '1px solid var(--border-color)', padding: '6px 0' }}>
+                  <div key={log.id_Auditoria} style={{ borderBottom: '1px solid rgba(0,0,0,0.05)', padding: '6px 0' }}>
                     <div>
                       <strong style={{ color: 'var(--accent-color)' }}>{log.clave}</strong>: 
                       <span style={{ color: 'var(--text-secondary)' }}> {log.valorAnterior || 'NULL'} </span> → 
-                      <strong> {log.valorNuevo}</strong>
+                      <strong style={{ color: 'var(--text-primary)' }}> {log.valorNuevo}</strong>
                     </div>
-                    <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                    <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '2px', fontWeight: 500 }}>
                       Por {log.usuarioModificacion} el {new Date(log.fechaModificacion).toLocaleString()} | Motivo: {log.motivo || 'No indicado'}
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div style={{ color: 'var(--text-secondary)', fontSize: '12px', textAlign: 'center', padding: '12px' }}>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '12px', textAlign: 'center', padding: '12px', fontWeight: 500 }}>
                 No hay registros de auditoría de configuración.
               </div>
             )}

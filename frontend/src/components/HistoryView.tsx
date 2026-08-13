@@ -106,16 +106,16 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ apiBaseUrl, onClose })
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '16px', boxSizing: 'border-box', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '16px 24px 16px 8px', boxSizing: 'border-box', overflow: 'hidden' }}>
       
       {/* HEADER ACTION */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px', marginBottom: '16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(0, 0, 0, 0.05)', paddingBottom: '16px', marginBottom: '16px' }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 800 }}>Historial de Validaciones y Trazabilidad</h2>
-          <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Auditoría completa de escaneos y punteros avanzados</span>
+          <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 800, letterSpacing: '-0.5px' }}>Historial de Validaciones y Trazabilidad</h2>
+          <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Auditoría completa de escaneos y punteros avanzados</span>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
-          <button className="btn btn-primary" onClick={handleExport} style={{ backgroundColor: '#10b981' }}>
+          <button className="btn btn-primary" onClick={handleExport} style={{ backgroundColor: '#059669', boxShadow: '0 4px 12px rgba(5, 150, 105, 0.15)' }}>
             <Download size={18} />
             Exportar CSV
           </button>
@@ -126,7 +126,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ apiBaseUrl, onClose })
       </div>
 
       {/* FILTERS PANEL */}
-      <section className="card-panel" style={{ padding: '16px', marginBottom: '16px', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+      <section className="card-panel" style={{ padding: '20px', marginBottom: '16px', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', borderRadius: '16px' }}>
         <div className="form-group" style={{ margin: 0 }}>
           <label>Desde:</label>
           <input type="datetime-local" className="form-input" value={desde} onChange={(e) => setDesde(e.target.value)} />
@@ -176,11 +176,11 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ apiBaseUrl, onClose })
       </section>
 
       {/* HISTORY TABLE GRID */}
-      <section className="card-panel" style={{ flex: 1, padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <section className="card-panel" style={{ flex: 1, padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', borderRadius: '16px' }}>
         <div style={{ overflowY: 'auto', flex: 1 }}>
           {isLoading ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-secondary)' }}>
-              <span>Cargando logs del servidor...</span>
+              <span style={{ fontWeight: 600 }}>Cargando logs del servidor...</span>
             </div>
           ) : history.length > 0 ? (
             <table className="data-table">
@@ -202,45 +202,30 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ apiBaseUrl, onClose })
               <tbody>
                 {history.map((row) => (
                   <tr key={row.iD_Validacion}>
-                    <td style={{ fontSize: '13px' }}>{new Date(row.fechaLectura).toLocaleString()}</td>
+                    <td style={{ fontSize: '13px', fontWeight: 500 }}>{new Date(row.fechaLectura).toLocaleString()}</td>
                     <td><strong style={{ color: 'var(--accent-color)' }}>{row.puesto}</strong></td>
-                    <td>{row.iD_OrdenProduccion}</td>
-                    <td>{row.secuencia ?? 'N/A'}</td>
-                    <td><strong>{row.referencia}</strong></td>
-                    <td style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{row.codigoOrnamentoEsperado || 'N/A'}</td>
-                    <td style={{ fontSize: '13px', fontWeight: 600 }}>{row.codigoOrnamentoLeido || 'N/A'}</td>
+                    <td style={{ fontWeight: 600 }}>{row.iD_OrdenProduccion}</td>
+                    <td style={{ fontWeight: 600 }}>{row.secuencia ?? 'N/A'}</td>
+                    <td><strong style={{ color: 'var(--text-primary)' }}>{row.referencia}</strong></td>
+                    <td style={{ fontSize: '13px', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>{row.codigoOrnamentoEsperado || 'N/A'}</td>
+                    <td style={{ fontSize: '13px', fontWeight: 700, fontFamily: 'monospace' }}>{row.codigoOrnamentoLeido || 'N/A'}</td>
                     <td>
-                      <span style={{ 
-                        display: 'inline-flex', 
-                        alignItems: 'center', 
-                        gap: '4px',
-                        padding: '4px 8px', 
-                        borderRadius: '12px', 
-                        fontSize: '11px',
-                        fontWeight: 700,
-                        backgroundColor: row.resultadoGeneral === 'APROBADO' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(220, 38, 38, 0.1)',
-                        color: row.resultadoGeneral === 'APROBADO' ? '#10b981' : '#f87171'
-                      }}>
-                        {row.resultadoGeneral === 'APROBADO' ? <CheckCircle size={12} /> : <XCircle size={12} />}
+                      <span className={`status-pill ${row.resultadoGeneral === 'APROBADO' ? 'approved' : 'rejected'}`}>
+                        {row.resultadoGeneral === 'APROBADO' ? <CheckCircle size={12} style={{ marginRight: '4px' }} /> : <XCircle size={12} style={{ marginRight: '4px' }} />}
                         {row.resultadoGeneral}
                       </span>
                     </td>
-                    <td style={{ fontSize: '12px', color: '#f87171' }}>{row.motivoRechazo || '-'}</td>
+                    <td style={{ fontSize: '12px', color: '#dc2626', fontWeight: 600 }}>{row.motivoRechazo || '-'}</td>
                     <td>
-                      <span style={{ 
-                        fontSize: '11px', 
-                        padding: '2px 6px', 
-                        borderRadius: '4px',
-                        background: row.estadoImpresion === 'COMPLETO' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)',
-                        color: row.estadoImpresion === 'COMPLETO' ? '#10b981' : '#f59e0b'
-                      }}>
+                      <span className={`status-pill ${row.estadoImpresion === 'COMPLETO' ? 'approved' : 'warning'}`}>
                         {row.estadoImpresion || 'N/A'}
                       </span>
                     </td>
                     <td>
                       <span style={{ 
                         fontSize: '11px',
-                        color: row.fechaAvancePuntero ? '#10b981' : '#6b7280'
+                        fontWeight: 700,
+                        color: row.fechaAvancePuntero ? '#059669' : '#dc2626'
                       }}>
                         {row.fechaAvancePuntero ? 'Avanzado ✓' : 'Pendiente ❌'}
                       </span>
@@ -252,7 +237,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ apiBaseUrl, onClose })
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-secondary)' }}>
               <FileText size={48} style={{ marginBottom: '16px', opacity: 0.3 }} />
-              <span>No se encontraron registros de trazabilidad</span>
+              <span style={{ fontWeight: 600 }}>No se encontraron registros de trazabilidad</span>
             </div>
           )}
         </div>

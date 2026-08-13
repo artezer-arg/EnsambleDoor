@@ -18,3 +18,8 @@ connection.json
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Generated print simulation files
+backend/publish/PrintedLabels/
+# Nested publish outputs
+backend/publish/publish/
