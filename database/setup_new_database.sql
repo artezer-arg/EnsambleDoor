@@ -99,7 +99,9 @@ BEGIN
         Impresora VARCHAR(100) NULL,
         EstadoImpresion VARCHAR(50) NULL,
         FechaAvancePuntero DATETIME NULL,
-        MensajeErrorTecnico NVARCHAR(MAX) NULL
+        MensajeErrorTecnico NVARCHAR(MAX) NULL,
+        Mano CHAR(1) NULL,
+        Posicion CHAR(1) NULL
     );
 
     -- Restricción única de QR para evitar procesar dos veces el mismo ornamento

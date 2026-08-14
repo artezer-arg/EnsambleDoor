@@ -29,6 +29,56 @@ namespace Backend.Services
                 }
                 _connectionString = _cachedConnectionString;
             }
+            
+            // Run automatic schema migration to ensure Mano and Posicion exist in Validacion_Ornamento
+            EnsureColumnsExist();
+        }
+
+        private void EnsureColumnsExist()
+        {
+            try
+            {
+                using var conn = GetConnection();
+                conn.Open();
+                
+                // Check and add Mano
+                bool hasMano = false;
+                using (var cmd = new SqlCommand("SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Validacion_Ornamento' AND COLUMN_NAME = 'Mano';", conn))
+                {
+                    var res = cmd.ExecuteScalar();
+                    if (res != null) hasMano = true;
+                }
+                
+                if (!hasMano)
+                {
+                    using (var cmd = new SqlCommand("ALTER TABLE dbo.Validacion_Ornamento ADD Mano CHAR(1) NULL;", conn))
+                    {
+                        cmd.ExecuteNonQuery();
+                    }
+                    Console.WriteLine("Columna 'Mano' agregada exitosamente a la tabla Validacion_Ornamento.");
+                }
+
+                // Check and add Posicion
+                bool hasPosicion = false;
+                using (var cmd = new SqlCommand("SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Validacion_Ornamento' AND COLUMN_NAME = 'Posicion';", conn))
+                {
+                    var res = cmd.ExecuteScalar();
+                    if (res != null) hasPosicion = true;
+                }
+                
+                if (!hasPosicion)
+                {
+                    using (var cmd = new SqlCommand("ALTER TABLE dbo.Validacion_Ornamento ADD Posicion CHAR(1) NULL;", conn))
+                    {
+                        cmd.ExecuteNonQuery();
+                    }
+                    Console.WriteLine("Columna 'Posicion' agregada exitosamente a la tabla Validacion_Ornamento.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error al ejecutar la migración de base de datos en inicio: {ex.Message}");
+            }
         }
 
         private static string LoadConnectionString(IConfiguration configuration)
