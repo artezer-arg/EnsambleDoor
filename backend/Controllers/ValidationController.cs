@@ -82,294 +82,310 @@ namespace Backend.Controllers
         [HttpPost("validate-scan")]
         public async Task<IActionResult> ValidateScan([FromBody] ValidateScanRequest request)
         {
-            if (request == null) return BadRequest("Datos del escaneo inválidos.");
-
-            Console.WriteLine($"[ValidateScan] ID_OP={request.ID_OrdenProduccion}, ID_OC={request.ID_OrdenCliente}, Orden={request.Orden}, Secuencia={request.Secuencia}, Ref={request.PanelReference}, Puesto={request.Puesto}, Qr={request.Qr}");
-
-            var configs = await _dbService.GetConfigsAsync();
-            var serverTime = await _dbService.GetServerDateTimeAsync();
-
-            // Fetch order from database to ensure metadata matches the database truth
-            var dbOrder = await _dbService.GetOrderProductionByIdAsync(request.ID_OrdenProduccion);
-
-            var validation = new Validacion
+            try
             {
-                ID_OrdenProduccion = request.ID_OrdenProduccion,
-                ID_OrdenCliente = dbOrder != null ? dbOrder.ID_OrdenCliente : request.ID_OrdenCliente,
-                Orden = dbOrder != null ? dbOrder.Orden : request.Orden,
-                Secuencia = dbOrder != null ? dbOrder.Secuencia : request.Secuencia,
-                SD = dbOrder != null ? dbOrder.SD : request.SD,
-                Referencia = dbOrder != null ? dbOrder.Referencia : request.PanelReference,
-                Puesto = request.Puesto,
-                Operador = request.Operador,
-                FechaActualServidor = serverTime,
-                QrCompleto = request.Qr,
-                ResultadoGeneral = "RECHAZADO",
-                Mano = dbOrder != null ? dbOrder.Mano : request.Mano,
-                Posicion = dbOrder != null ? dbOrder.Posicion : request.Posicion
-            };
+                if (request == null) return BadRequest("Datos del escaneo inválidos.");
 
-            // 1. Check Equivalence Config
-            var equiv = await _dbService.GetEquivalenceAsync(validation.Referencia);
-            if (equiv == null)
-            {
-                validation.ResultadoGeneral = "RECHAZADO";
-                validation.MotivoRechazo = "PANEL SIN EQUIVALENCIA CONFIGURADA";
-                validation.ID_Validacion = await _dbService.InsertValidationLogAsync(validation);
-                return Ok(new { success = false, validation });
-            }
+                Console.WriteLine($"[ValidateScan] ID_OP={request.ID_OrdenProduccion}, ID_OC={request.ID_OrdenCliente}, Orden={request.Orden}, Secuencia={request.Secuencia}, Ref={request.PanelReference}, Puesto={request.Puesto}, Qr={request.Qr}");
 
-            validation.CodigoOrnamentoEsperado = equiv.CodigoOrnamento;
+                var configs = await _dbService.GetConfigsAsync();
+                var serverTime = await _dbService.GetServerDateTimeAsync();
 
-            // 2. Parse QR Code
-            var parseResult = _qrParser.ParseQr(request.Qr, configs);
-            if (!parseResult.IsValid)
-            {
-                validation.ResultadoGeneral = "RECHAZADO";
-                validation.MotivoRechazo = parseResult.ErrorMessage ?? "QR Invalido";
-                validation.ID_Validacion = await _dbService.InsertValidationLogAsync(validation);
-                return Ok(new { success = false, validation });
-            }
+                // Fetch order from database to ensure metadata matches the database truth
+                var dbOrder = await _dbService.GetOrderProductionByIdAsync(request.ID_OrdenProduccion);
 
-            validation.CodigoOrnamentoLeido = parseResult.OrnamentCode;
-            validation.NumeroSerie = parseResult.SerialNumber;
-            validation.InicioCurado = parseResult.CureStartTime;
-
-            // 3. Check Duplicates (QR code successfully used)
-            var isDuplicate = await _dbService.CheckQrProcessedAsync(request.Qr);
-            if (isDuplicate)
-            {
-                var priorVal = await _dbService.GetPriorValidationByQrAsync(request.Qr);
-                validation.ResultadoGeneral = "RECHAZADO";
-                validation.MotivoRechazo = "ORNAMENTO YA PROCESADO";
-                validation.ID_Validacion = await _dbService.InsertValidationLogAsync(validation);
-                return Ok(new
+                var validation = new Validacion
                 {
-                    success = false,
-                    validation,
-                    priorUse = priorVal != null ? new
-                    {
-                        fecha = priorVal.FechaLectura,
-                        puesto = priorVal.Puesto,
-                        panel = priorVal.Referencia,
-                        ordenProduccion = priorVal.ID_OrdenProduccion,
-                        operador = priorVal.Operador
-                    } : null
-                });
-            }
+                    ID_OrdenProduccion = request.ID_OrdenProduccion,
+                    ID_OrdenCliente = dbOrder != null ? dbOrder.ID_OrdenCliente : request.ID_OrdenCliente,
+                    Orden = dbOrder != null ? dbOrder.Orden : request.Orden,
+                    Secuencia = dbOrder != null ? dbOrder.Secuencia : request.Secuencia,
+                    SD = dbOrder != null ? dbOrder.SD : request.SD,
+                    Referencia = dbOrder != null ? dbOrder.Referencia : request.PanelReference,
+                    Puesto = request.Puesto,
+                    Operador = request.Operador,
+                    FechaActualServidor = serverTime,
+                    QrCompleto = request.Qr,
+                    ResultadoGeneral = "RECHAZADO",
+                    Mano = dbOrder != null ? dbOrder.Mano : request.Mano,
+                    Posicion = dbOrder != null ? dbOrder.Posicion : request.Posicion
+                };
 
-            // 4. Validate Ornament Correspondence
-            string cleanExpected = (equiv.CodigoOrnamento ?? "").Replace(" ", "").Replace("-", "").ToUpper();
-            string cleanLeido = (parseResult.OrnamentCode ?? "").Replace(" ", "").Replace("-", "").ToUpper();
-
-            if (!cleanExpected.Equals(cleanLeido))
-            {
-                validation.ResultadoCorrespondencia = "ORNAMENTO INCORRECTO";
-                validation.ResultadoGeneral = "RECHAZADO";
-                validation.MotivoRechazo = "ORNAMENTO INCORRECTO";
-                validation.ID_Validacion = await _dbService.InsertValidationLogAsync(validation);
-                return Ok(new { success = false, validation });
-            }
-            validation.ResultadoCorrespondencia = "ORNAMENTO CORRECTO";
-
-            // 5. Validate Curing Time
-            if (parseResult.CureStartTime.HasValue)
-            {
-                var start = parseResult.CureStartTime.Value;
-                if (start > serverTime)
+                // 1. Check Equivalence Config
+                var equiv = await _dbService.GetEquivalenceAsync(validation.Referencia);
+                if (equiv == null)
                 {
-                    validation.ResultadoCurado = "FECHA DE CURADO INVÁLIDA";
                     validation.ResultadoGeneral = "RECHAZADO";
-                    validation.MotivoRechazo = "FECHA DE CURADO INVÁLIDA";
+                    validation.MotivoRechazo = "PANEL SIN EQUIVALENCIA CONFIGURADA";
                     validation.ID_Validacion = await _dbService.InsertValidationLogAsync(validation);
                     return Ok(new { success = false, validation });
                 }
 
-                double elapsedMinutes = (serverTime - start).TotalMinutes;
-                validation.MinutosCurado = (int)elapsedMinutes;
-                
-                int minHours = int.Parse(configs.GetValueOrDefault("Min_Curing_Hours", "4"));
-                validation.TiempoMinimoRequerido = minHours * 60;
+                validation.CodigoOrnamentoEsperado = equiv.CodigoOrnamento;
 
-                if (elapsedMinutes < (minHours * 60))
+                // 2. Parse QR Code
+                var parseResult = _qrParser.ParseQr(request.Qr, configs);
+                if (!parseResult.IsValid)
                 {
-                    validation.ResultadoCurado = "CURADO INSUFICIENTE";
                     validation.ResultadoGeneral = "RECHAZADO";
-                    int remainingMin = (minHours * 60) - (int)elapsedMinutes;
-                    validation.MotivoRechazo = $"CURADO INSUFICIENTE (FALTAN {remainingMin} MIN)";
+                    validation.MotivoRechazo = parseResult.ErrorMessage ?? "QR Invalido";
                     validation.ID_Validacion = await _dbService.InsertValidationLogAsync(validation);
-                    return Ok(new { success = false, validation, remainingMinutes = remainingMin });
+                    return Ok(new { success = false, validation });
                 }
-                validation.ResultadoCurado = "CURADO APROBADO";
-            }
-            else
-            {
-                validation.ResultadoCurado = "N/A";
-            }
 
-            // 6. Complete Validation Approved
-            validation.ResultadoGeneral = "APROBADO";
-            validation.EstadoImpresion = "PENDIENTE";
+                validation.CodigoOrnamentoLeido = parseResult.OrnamentCode;
+                validation.NumeroSerie = parseResult.SerialNumber;
+                validation.InicioCurado = parseResult.CureStartTime;
 
-            // Save log in DB
-            validation.ID_Validacion = await _dbService.InsertValidationLogAsync(validation);
+                // 3. Check Duplicates (QR code successfully used)
+                var isDuplicate = await _dbService.CheckQrProcessedAsync(request.Qr);
+                if (isDuplicate)
+                {
+                    var priorVal = await _dbService.GetPriorValidationByQrAsync(request.Qr);
+                    validation.ResultadoGeneral = "RECHAZADO";
+                    validation.MotivoRechazo = "ORNAMENTO YA PROCESADO";
+                    validation.ID_Validacion = await _dbService.InsertValidationLogAsync(validation);
+                    return Ok(new
+                    {
+                        success = false,
+                        validation,
+                        priorUse = priorVal != null ? new
+                        {
+                            fecha = priorVal.FechaLectura,
+                            puesto = priorVal.Puesto,
+                            panel = priorVal.Referencia,
+                            ordenProduccion = priorVal.ID_OrdenProduccion,
+                            operador = priorVal.Operador
+                        } : null
+                    });
+                }
 
-            // 7. Print Kanban label
-            var printResult = await _printer.PrintKanbanAsync(validation, configs);
-            if (!printResult.Success)
-            {
-                await _dbService.UpdateValidationPrintStatusAsync(validation.ID_Validacion, "FALLIDO", printResult.PrinterUsed, printResult.ErrorMessage);
-                validation.EstadoImpresion = "FALLIDO";
-                validation.MensajeErrorTecnico = printResult.ErrorMessage;
-                
-                return Ok(new { 
-                    success = false, 
-                    message = "ERROR DE IMPRESIÓN", 
-                    validation, 
-                    preview = printResult.Base64LabelPreview 
-                });
-            }
+                // 4. Validate Ornament Correspondence
+                string cleanExpected = (equiv.CodigoOrnamento ?? "").Replace(" ", "").Replace("-", "").ToUpper();
+                string cleanLeido = (parseResult.OrnamentCode ?? "").Replace(" ", "").Replace("-", "").ToUpper();
 
-            await _dbService.UpdateValidationPrintStatusAsync(validation.ID_Validacion, "COMPLETO", printResult.PrinterUsed, null);
-            validation.EstadoImpresion = "COMPLETO";
+                if (!cleanExpected.Equals(cleanLeido))
+                {
+                    validation.ResultadoCorrespondencia = "ORNAMENTO INCORRECTO";
+                    validation.ResultadoGeneral = "RECHAZADO";
+                    validation.MotivoRechazo = "ORNAMENTO INCORRECTO";
+                    validation.ID_Validacion = await _dbService.InsertValidationLogAsync(validation);
+                    return Ok(new { success = false, validation });
+                }
+                validation.ResultadoCorrespondencia = "ORNAMENTO CORRECTO";
 
-            // 8. Commit SQL database Sequence pointer advance
-            try
-            {
-                await _dbService.CompletePanelProcessAsync(
-                    request.ID_OrdenProduccion,
-                    request.ID_OrdenCliente,
-                    request.Puesto,
-                    request.Orden
-                );
+                // 5. Validate Curing Time
+                if (parseResult.CureStartTime.HasValue)
+                {
+                    var start = parseResult.CureStartTime.Value;
+                    if (start > serverTime)
+                    {
+                        validation.ResultadoCurado = "FECHA DE CURADO INVÁLIDA";
+                        validation.ResultadoGeneral = "RECHAZADO";
+                        validation.MotivoRechazo = "FECHA DE CURADO INVÁLIDA";
+                        validation.ID_Validacion = await _dbService.InsertValidationLogAsync(validation);
+                        return Ok(new { success = false, validation });
+                    }
 
-                await _dbService.UpdateValidationPointerAdvancedAsync(validation.ID_Validacion);
-                validation.FechaAvancePuntero = DateTime.Now;
+                    double elapsedMinutes = (serverTime - start).TotalMinutes;
+                    validation.MinutosCurado = (int)elapsedMinutes;
+                    
+                    int minHours = int.Parse(configs.GetValueOrDefault("Min_Curing_Hours", "4"));
+                    validation.TiempoMinimoRequerido = minHours * 60;
 
-                return Ok(new { 
-                    success = true, 
-                    message = "PROCESO COMPLETADO", 
-                    validation, 
-                    preview = printResult.Base64LabelPreview 
-                });
+                    if (elapsedMinutes < (minHours * 60))
+                    {
+                        validation.ResultadoCurado = "CURADO INSUFICIENTE";
+                        validation.ResultadoGeneral = "RECHAZADO";
+                        int remainingMin = (minHours * 60) - (int)elapsedMinutes;
+                        validation.MotivoRechazo = $"CURADO INSUFICIENTE (FALTAN {remainingMin} MIN)";
+                        validation.ID_Validacion = await _dbService.InsertValidationLogAsync(validation);
+                        return Ok(new { success = false, validation, remainingMinutes = remainingMin });
+                    }
+                    validation.ResultadoCurado = "CURADO APROBADO";
+                }
+                else
+                {
+                    validation.ResultadoCurado = "N/A";
+                }
+
+                // 6. Complete Validation Approved
+                validation.ResultadoGeneral = "APROBADO";
+                validation.EstadoImpresion = "PENDIENTE";
+
+                // Save log in DB
+                validation.ID_Validacion = await _dbService.InsertValidationLogAsync(validation);
+
+                // 7. Print Kanban label
+                var printResult = await _printer.PrintKanbanAsync(validation, configs);
+                if (!printResult.Success)
+                {
+                    await _dbService.UpdateValidationPrintStatusAsync(validation.ID_Validacion, "FALLIDO", printResult.PrinterUsed, printResult.ErrorMessage);
+                    validation.EstadoImpresion = "FALLIDO";
+                    validation.MensajeErrorTecnico = printResult.ErrorMessage;
+                    
+                    return Ok(new { 
+                        success = false, 
+                        message = "ERROR DE IMPRESIÓN", 
+                        validation, 
+                        preview = printResult.Base64LabelPreview 
+                    });
+                }
+
+                await _dbService.UpdateValidationPrintStatusAsync(validation.ID_Validacion, "COMPLETO", printResult.PrinterUsed, null);
+                validation.EstadoImpresion = "COMPLETO";
+
+                // 8. Commit SQL database Sequence pointer advance
+                try
+                {
+                    await _dbService.CompletePanelProcessAsync(
+                        request.ID_OrdenProduccion,
+                        request.ID_OrdenCliente,
+                        request.Puesto,
+                        request.Orden
+                    );
+
+                    await _dbService.UpdateValidationPointerAdvancedAsync(validation.ID_Validacion);
+                    validation.FechaAvancePuntero = DateTime.Now;
+
+                    return Ok(new { 
+                        success = true, 
+                        message = "PROCESO COMPLETADO", 
+                        validation, 
+                        preview = printResult.Base64LabelPreview 
+                    });
+                }
+                catch (Exception ex)
+                {
+                    // DB Pointer advance failed, but Kanban printed! (Prueba 10 scenario)
+                    validation.MensajeErrorTecnico = $"Impresión exitosa, pero falló avance de puntero en base de datos. Detalle: {ex.Message}";
+                    await _dbService.UpdateValidationPrintStatusAsync(validation.ID_Validacion, "COMPLETO", printResult.PrinterUsed, validation.MensajeErrorTecnico);
+                    
+                    return Ok(new { 
+                        success = false, 
+                        dbError = true, 
+                        message = "ERROR AL ACTUALIZAR SECUENCIA EN BASE DE DATOS", 
+                        validation, 
+                        preview = printResult.Base64LabelPreview 
+                    });
+                }
             }
             catch (Exception ex)
             {
-                // DB Pointer advance failed, but Kanban printed! (Prueba 10 scenario)
-                validation.MensajeErrorTecnico = $"Impresión exitosa, pero falló avance de puntero en base de datos. Detalle: {ex.Message}";
-                await _dbService.UpdateValidationPrintStatusAsync(validation.ID_Validacion, "COMPLETO", printResult.PrinterUsed, validation.MensajeErrorTecnico);
-                
-                return Ok(new { 
-                    success = false, 
-                    dbError = true, 
-                    message = "ERROR AL ACTUALIZAR SECUENCIA EN BASE DE DATOS", 
-                    validation, 
-                    preview = printResult.Base64LabelPreview 
-                });
+                Console.WriteLine($"[ValidateScan Exception] {ex}");
+                return StatusCode(500, new { message = "Error interno de servidor al validar.", detail = ex.Message, stackTrace = ex.StackTrace });
             }
         }
 
         [HttpPost("confirm-no-ornament")]
         public async Task<IActionResult> ConfirmNoOrnament([FromBody] ConfirmNoOrnamentRequest request)
         {
-            if (request == null) return BadRequest("Datos inválidos.");
-
-            Console.WriteLine($"[ConfirmNoOrnament] ID_OP={request.ID_OrdenProduccion}, ID_OC={request.ID_OrdenCliente}, Orden={request.Orden}, Secuencia={request.Secuencia}, Ref={request.PanelReference}, Puesto={request.Puesto}");
-
-            var configs = await _dbService.GetConfigsAsync();
-            var serverTime = await _dbService.GetServerDateTimeAsync();
-
-            // Fetch order from database to ensure metadata matches the database truth
-            var dbOrder = await _dbService.GetOrderProductionByIdAsync(request.ID_OrdenProduccion);
-
-            var validation = new Validacion
-            {
-                ID_OrdenProduccion = request.ID_OrdenProduccion,
-                ID_OrdenCliente = dbOrder != null ? dbOrder.ID_OrdenCliente : request.ID_OrdenCliente,
-                Orden = dbOrder != null ? dbOrder.Orden : request.Orden,
-                Secuencia = dbOrder != null ? dbOrder.Secuencia : request.Secuencia,
-                SD = dbOrder != null ? dbOrder.SD : request.SD,
-                Referencia = dbOrder != null ? dbOrder.Referencia : request.PanelReference,
-                Puesto = request.Puesto,
-                Operador = request.Operador,
-                FechaActualServidor = serverTime,
-                QrCompleto = $"SIN_ORNAMENTO_OP_{request.ID_OrdenProduccion}_SEC_{(dbOrder != null ? dbOrder.Secuencia : request.Secuencia)}_{Guid.NewGuid().ToString().Substring(0, 8)}",
-                ResultadoGeneral = "APROBADO",
-                ResultadoCorrespondencia = "N/A",
-                ResultadoCurado = "N/A",
-                EstadoImpresion = "PENDIENTE",
-                Mano = dbOrder != null ? dbOrder.Mano : request.Mano,
-                Posicion = dbOrder != null ? dbOrder.Posicion : request.Posicion
-            };
-
-            // Check Equivalence
-            var equiv = await _dbService.GetEquivalenceAsync(validation.Referencia);
-            if (equiv == null)
-            {
-                validation.ResultadoGeneral = "RECHAZADO";
-                validation.MotivoRechazo = "PANEL SIN EQUIVALENCIA CONFIGURADA";
-                validation.ID_Validacion = await _dbService.InsertValidationLogAsync(validation);
-                return Ok(new { success = false, validation });
-            }
-
-            if (equiv.RequiereOrnamento)
-            {
-                return BadRequest("Este panel requiere leer un ornamento, no puede confirmarse sin él.");
-            }
-
-            // Save log
-            validation.ID_Validacion = await _dbService.InsertValidationLogAsync(validation);
-
-            // Print Kanban label
-            var printResult = await _printer.PrintKanbanAsync(validation, configs);
-            if (!printResult.Success)
-            {
-                await _dbService.UpdateValidationPrintStatusAsync(validation.ID_Validacion, "FALLIDO", printResult.PrinterUsed, printResult.ErrorMessage);
-                validation.EstadoImpresion = "FALLIDO";
-                
-                return Ok(new { 
-                    success = false, 
-                    message = "ERROR DE IMPRESIÓN", 
-                    validation, 
-                    preview = printResult.Base64LabelPreview 
-                });
-            }
-
-            await _dbService.UpdateValidationPrintStatusAsync(validation.ID_Validacion, "COMPLETO", printResult.PrinterUsed, null);
-            validation.EstadoImpresion = "COMPLETO";
-
-            // Advance DB pointer
             try
             {
-                await _dbService.CompletePanelProcessAsync(
-                    request.ID_OrdenProduccion,
-                    request.ID_OrdenCliente,
-                    request.Puesto,
-                    request.Orden
-                );
+                if (request == null) return BadRequest("Datos inválidos.");
 
-                await _dbService.UpdateValidationPointerAdvancedAsync(validation.ID_Validacion);
-                validation.FechaAvancePuntero = DateTime.Now;
+                Console.WriteLine($"[ConfirmNoOrnament] ID_OP={request.ID_OrdenProduccion}, ID_OC={request.ID_OrdenCliente}, Orden={request.Orden}, Secuencia={request.Secuencia}, Ref={request.PanelReference}, Puesto={request.Puesto}");
 
-                return Ok(new { 
-                    success = true, 
-                    message = "PROCESO COMPLETADO", 
-                    validation, 
-                    preview = printResult.Base64LabelPreview 
-                });
+                var configs = await _dbService.GetConfigsAsync();
+                var serverTime = await _dbService.GetServerDateTimeAsync();
+
+                // Fetch order from database to ensure metadata matches the database truth
+                var dbOrder = await _dbService.GetOrderProductionByIdAsync(request.ID_OrdenProduccion);
+
+                var validation = new Validacion
+                {
+                    ID_OrdenProduccion = request.ID_OrdenProduccion,
+                    ID_OrdenCliente = dbOrder != null ? dbOrder.ID_OrdenCliente : request.ID_OrdenCliente,
+                    Orden = dbOrder != null ? dbOrder.Orden : request.Orden,
+                    Secuencia = dbOrder != null ? dbOrder.Secuencia : request.Secuencia,
+                    SD = dbOrder != null ? dbOrder.SD : request.SD,
+                    Referencia = dbOrder != null ? dbOrder.Referencia : request.PanelReference,
+                    Puesto = request.Puesto,
+                    Operador = request.Operador,
+                    FechaActualServidor = serverTime,
+                    QrCompleto = $"SIN_ORNAMENTO_OP_{request.ID_OrdenProduccion}_SEC_{(dbOrder != null ? dbOrder.Secuencia : request.Secuencia)}_{Guid.NewGuid().ToString().Substring(0, 8)}",
+                    ResultadoGeneral = "APROBADO",
+                    ResultadoCorrespondencia = "N/A",
+                    ResultadoCurado = "N/A",
+                    EstadoImpresion = "PENDIENTE",
+                    Mano = dbOrder != null ? dbOrder.Mano : request.Mano,
+                    Posicion = dbOrder != null ? dbOrder.Posicion : request.Posicion
+                };
+
+                // Check Equivalence
+                var equiv = await _dbService.GetEquivalenceAsync(validation.Referencia);
+                if (equiv == null)
+                {
+                    validation.ResultadoGeneral = "RECHAZADO";
+                    validation.MotivoRechazo = "PANEL SIN EQUIVALENCIA CONFIGURADA";
+                    validation.ID_Validacion = await _dbService.InsertValidationLogAsync(validation);
+                    return Ok(new { success = false, validation });
+                }
+
+                if (equiv.RequiereOrnamento)
+                {
+                    return BadRequest("Este panel requiere leer un ornamento, no puede confirmarse sin él.");
+                }
+
+                // Save log
+                validation.ID_Validacion = await _dbService.InsertValidationLogAsync(validation);
+
+                // Print Kanban label
+                var printResult = await _printer.PrintKanbanAsync(validation, configs);
+                if (!printResult.Success)
+                {
+                    await _dbService.UpdateValidationPrintStatusAsync(validation.ID_Validacion, "FALLIDO", printResult.PrinterUsed, printResult.ErrorMessage);
+                    validation.EstadoImpresion = "FALLIDO";
+                    
+                    return Ok(new { 
+                        success = false, 
+                        message = "ERROR DE IMPRESIÓN", 
+                        validation, 
+                        preview = printResult.Base64LabelPreview 
+                    });
+                }
+
+                await _dbService.UpdateValidationPrintStatusAsync(validation.ID_Validacion, "COMPLETO", printResult.PrinterUsed, null);
+                validation.EstadoImpresion = "COMPLETO";
+
+                // Advance DB pointer
+                try
+                {
+                    await _dbService.CompletePanelProcessAsync(
+                        request.ID_OrdenProduccion,
+                        request.ID_OrdenCliente,
+                        request.Puesto,
+                        request.Orden
+                    );
+
+                    await _dbService.UpdateValidationPointerAdvancedAsync(validation.ID_Validacion);
+                    validation.FechaAvancePuntero = DateTime.Now;
+
+                    return Ok(new { 
+                        success = true, 
+                        message = "PROCESO COMPLETADO", 
+                        validation, 
+                        preview = printResult.Base64LabelPreview 
+                    });
+                }
+                catch (Exception ex)
+                {
+                    validation.MensajeErrorTecnico = $"Impresión exitosa, pero falló avance de puntero en base de datos. Detalle: {ex.Message}";
+                    await _dbService.UpdateValidationPrintStatusAsync(validation.ID_Validacion, "COMPLETO", printResult.PrinterUsed, validation.MensajeErrorTecnico);
+                    
+                    return Ok(new { 
+                        success = false, 
+                        dbError = true, 
+                        message = "ERROR AL ACTUALIZAR SECUENCIA EN BASE DE DATOS", 
+                        validation, 
+                        preview = printResult.Base64LabelPreview 
+                    });
+                }
             }
             catch (Exception ex)
             {
-                validation.MensajeErrorTecnico = $"Impresión exitosa, pero falló avance de puntero en base de datos. Detalle: {ex.Message}";
-                await _dbService.UpdateValidationPrintStatusAsync(validation.ID_Validacion, "COMPLETO", printResult.PrinterUsed, validation.MensajeErrorTecnico);
-                
-                return Ok(new { 
-                    success = false, 
-                    dbError = true, 
-                    message = "ERROR AL ACTUALIZAR SECUENCIA EN BASE DE DATOS", 
-                    validation, 
-                    preview = printResult.Base64LabelPreview 
-                });
+                Console.WriteLine($"[ConfirmNoOrnament Exception] {ex}");
+                return StatusCode(500, new { message = "Error interno de servidor al confirmar sin ornamento.", detail = ex.Message, stackTrace = ex.StackTrace });
             }
         }
 

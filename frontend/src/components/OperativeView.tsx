@@ -457,8 +457,9 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
           setIsProcessing(false);
         }
       } else {
+        const err = await res.json().catch(() => ({}));
         setFooterState('error');
-        setFooterText('ERROR DE SERVIDOR AL VALIDAR');
+        setFooterText(err.detail || err.message || 'ERROR DE SERVIDOR AL VALIDAR');
         playSound('error');
         setIsProcessing(false);
       }
@@ -554,8 +555,9 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
           setIsProcessing(false);
         }
       } else {
+        const err = await res.json().catch(() => ({}));
         setFooterState('error');
-        setFooterText('ERROR DE CONEXIÓN CON EL SERVIDOR');
+        setFooterText(err.detail || err.message || 'ERROR AL CONFIRMAR PANEL SIN ORNAMENTO');
         playSound('error');
         setIsProcessing(false);
       }
