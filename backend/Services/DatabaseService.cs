@@ -41,38 +41,171 @@ namespace Backend.Services
                 using var conn = GetConnection();
                 conn.Open();
                 
-                // Check and add Mano
-                bool hasMano = false;
-                using (var cmd = new SqlCommand("SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Validacion_Ornamento' AND COLUMN_NAME = 'Mano';", conn))
+                var addColumnIfMissing = new Action<string, string, string>((tableName, columnName, columnDef) =>
                 {
-                    var res = cmd.ExecuteScalar();
-                    if (res != null) hasMano = true;
-                }
-                
-                if (!hasMano)
-                {
-                    using (var cmd = new SqlCommand("ALTER TABLE dbo.Validacion_Ornamento ADD Mano CHAR(1) NULL;", conn))
+                    bool exists = false;
+                    string checkSql = $"SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '{tableName}' AND COLUMN_NAME = '{columnName}';";
+                    using (var cmd = new SqlCommand(checkSql, conn))
                     {
-                        cmd.ExecuteNonQuery();
+                        var res = cmd.ExecuteScalar();
+                        if (res != null) exists = true;
                     }
-                    Console.WriteLine("Columna 'Mano' agregada exitosamente a la tabla Validacion_Ornamento.");
+                    
+                    if (!exists)
+                    {
+                        string alterSql = $"ALTER TABLE dbo.{tableName} ADD {columnName} {columnDef};";
+                        using (var cmd = new SqlCommand(alterSql, conn))
+                        {
+                            cmd.ExecuteNonQuery();
+                        }
+                        Console.WriteLine($"Columna '{columnName}' agregada exitosamente a la tabla {tableName}.");
+                    }
+                });
+
+                // 1. Ensure columns in Validacion_Ornamento
+                addColumnIfMissing("Validacion_Ornamento", "Mano", "CHAR(1) NULL");
+                addColumnIfMissing("Validacion_Ornamento", "Posicion", "CHAR(1) NULL");
+
+                // 2. Ensure columns in Orden_Produccion
+                addColumnIfMissing("Orden_Produccion", "Mano", "CHAR(1) NULL");
+                addColumnIfMissing("Orden_Produccion", "Posicion", "CHAR(1) NULL");
+
+                // 3. Recreate SP_ObtenerSiguientePanel
+                string dropSp1 = "IF OBJECT_ID('dbo.SP_ObtenerSiguientePanel', 'P') IS NOT NULL DROP PROCEDURE dbo.SP_ObtenerSiguientePanel;";
+                using (var cmd = new SqlCommand(dropSp1, conn))
+                {
+                    cmd.ExecuteNonQuery();
                 }
 
-                // Check and add Posicion
-                bool hasPosicion = false;
-                using (var cmd = new SqlCommand("SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Validacion_Ornamento' AND COLUMN_NAME = 'Posicion';", conn))
+                string createSp1 = @"
+CREATE PROCEDURE dbo.SP_ObtenerSiguientePanel
+    @Puesto VARCHAR(20)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    WITH Consulta_Principal AS
+    (
+        SELECT TOP (1)
+            OP.Lector,
+            P.Puntero_ID_OrdenProduccion,
+            OP.ID_OrdenProduccion,
+            OP.ID_OrdenCliente,
+            OP.Secuencia,
+            OP.Fecha_Secuencia,
+            OP.Suffix,
+            OP.Fecha_Proceso,
+            OP.SD,
+            OP.Referencia,
+            OP.Puesto,
+            OP.Orden,
+            OP.Estado,
+            ISNULL(OP.Posicion, '') + ISNULL(OP.Mano, '') AS Expr1,
+            OP.Mano,
+            OP.Posicion
+        FROM dbo.Orden_Produccion AS OP
+        INNER JOIN dbo.Puesto AS P
+            ON OP.Lector = P.Lector
+            AND OP.Puesto = P.Puesto
+            AND OP.ID_OrdenProduccion > P.Puntero_ID_OrdenProduccion
+        WHERE OP.Puesto LIKE '%' + @Puesto + '%'
+        ORDER BY
+            OP.ID_OrdenProduccion,
+            OP.Orden
+    )
+    SELECT
+        Referencia,
+        ID_OrdenProduccion,
+        ID_OrdenCliente,
+        Orden,
+        Secuencia,
+        SD,
+        Expr1,
+        Puesto,
+        Fecha_Secuencia AS FechaSecuencia,
+        Mano,
+        Posicion
+    FROM Consulta_Principal;
+END;";
+                using (var cmd = new SqlCommand(createSp1, conn))
                 {
-                    var res = cmd.ExecuteScalar();
-                    if (res != null) hasPosicion = true;
+                    cmd.ExecuteNonQuery();
                 }
-                
-                if (!hasPosicion)
+
+                // 4. Recreate SP_FinalizarProcesoPanel
+                string dropSp2 = "IF OBJECT_ID('dbo.SP_FinalizarProcesoPanel', 'P') IS NOT NULL DROP PROCEDURE dbo.SP_FinalizarProcesoPanel;";
+                using (var cmd = new SqlCommand(dropSp2, conn))
                 {
-                    using (var cmd = new SqlCommand("ALTER TABLE dbo.Validacion_Ornamento ADD Posicion CHAR(1) NULL;", conn))
-                    {
-                        cmd.ExecuteNonQuery();
-                    }
-                    Console.WriteLine("Columna 'Posicion' agregada exitosamente a la tabla Validacion_Ornamento.");
+                    cmd.ExecuteNonQuery();
+                }
+
+                string createSp2 = @"
+CREATE PROCEDURE dbo.SP_FinalizarProcesoPanel
+    @ID_OrdenProduccion INT,
+    @ID_OrdenCliente INT,
+    @Puesto VARCHAR(20),
+    @Orden INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        IF EXISTS
+        (
+            SELECT 1
+            FROM dbo.Produccion_Secuencia WITH (UPDLOCK, HOLDLOCK)
+            WHERE ID_OrdenProduccion = @ID_OrdenProduccion
+              AND Puesto = @Puesto
+        )
+        BEGIN
+            THROW 50001, 'La orden ya fue procesada en este puesto.', 1;
+        END;
+
+        INSERT INTO dbo.Produccion_Secuencia
+        (
+            ID_OrdenProduccion,
+            ID_OrdenCliente,
+            Puesto,
+            Fecha,
+            Orden
+        )
+        VALUES
+        (
+            @ID_OrdenProduccion,
+            @ID_OrdenCliente,
+            @Puesto,
+            GETDATE(),
+            @Orden
+        );
+
+        UPDATE dbo.Puesto WITH (ROWLOCK)
+        SET Puntero_ID_OrdenProduccion = @ID_OrdenProduccion
+        WHERE Puesto = @Puesto
+          AND Puntero_ID_OrdenProduccion < @ID_OrdenProduccion;
+
+        IF @@ROWCOUNT = 0
+        BEGIN
+            THROW 50002, 'No se pudo avanzar el puntero del puesto.', 1;
+        END;
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+
+        DECLARE @ErrorMessage NVARCHAR(4000) = ERROR_MESSAGE();
+        DECLARE @ErrorSeverity INT = ERROR_SEVERITY();
+        DECLARE @ErrorState INT = ERROR_STATE();
+        
+        RAISERROR(@ErrorMessage, @ErrorSeverity, @ErrorState);
+    END CATCH;
+END;";
+                using (var cmd = new SqlCommand(createSp2, conn))
+                {
+                    cmd.ExecuteNonQuery();
                 }
             }
             catch (Exception ex)
