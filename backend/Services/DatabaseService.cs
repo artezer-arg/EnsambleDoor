@@ -60,15 +60,24 @@ namespace Backend.Services
                         }
                         Console.WriteLine($"Columna '{columnName}' agregada exitosamente a la tabla {tableName}.");
                     }
+                    else
+                    {
+                        // Ensure column type is VARCHAR(10) to prevent truncation of values like "LH"/"RH" or "FR"/"RR"
+                        string alterTypeSql = $"ALTER TABLE dbo.{tableName} ALTER COLUMN {columnName} {columnDef};";
+                        using (var cmd = new SqlCommand(alterTypeSql, conn))
+                        {
+                            cmd.ExecuteNonQuery();
+                        }
+                    }
                 });
 
                 // 1. Ensure columns in Validacion_Ornamento
-                addColumnIfMissing("Validacion_Ornamento", "Mano", "CHAR(1) NULL");
-                addColumnIfMissing("Validacion_Ornamento", "Posicion", "CHAR(1) NULL");
+                addColumnIfMissing("Validacion_Ornamento", "Mano", "VARCHAR(10) NULL");
+                addColumnIfMissing("Validacion_Ornamento", "Posicion", "VARCHAR(10) NULL");
 
                 // 2. Ensure columns in Orden_Produccion
-                addColumnIfMissing("Orden_Produccion", "Mano", "CHAR(1) NULL");
-                addColumnIfMissing("Orden_Produccion", "Posicion", "CHAR(1) NULL");
+                addColumnIfMissing("Orden_Produccion", "Mano", "VARCHAR(10) NULL");
+                addColumnIfMissing("Orden_Produccion", "Posicion", "VARCHAR(10) NULL");
 
                 // 3. Recreate SP_ObtenerSiguientePanel
                 string dropSp1 = "IF OBJECT_ID('dbo.SP_ObtenerSiguientePanel', 'P') IS NOT NULL DROP PROCEDURE dbo.SP_ObtenerSiguientePanel;";

@@ -100,8 +100,8 @@ BEGIN
         EstadoImpresion VARCHAR(50) NULL,
         FechaAvancePuntero DATETIME NULL,
         MensajeErrorTecnico NVARCHAR(MAX) NULL,
-        Mano CHAR(1) NULL,
-        Posicion CHAR(1) NULL
+        Mano VARCHAR(10) NULL,
+        Posicion VARCHAR(10) NULL
     );
 
     -- Restricción única de QR para evitar procesar dos veces el mismo ornamento
@@ -144,8 +144,8 @@ BEGIN
         Estado INT NOT NULL DEFAULT 1,
         Impresiones_Intentos INT NOT NULL DEFAULT 0,
         Etiqueta_Confirmada BIT NOT NULL DEFAULT 0,
-        Mano CHAR(1) NULL,
-        Posicion CHAR(1) NULL
+        Mano VARCHAR(10) NULL,
+        Posicion VARCHAR(10) NULL
     );
 END;
 GO
