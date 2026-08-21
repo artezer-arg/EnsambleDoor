@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Save, Printer, RefreshCw, Layers, Sparkles, 
-  CheckCircle2, AlertTriangle, Trash2, Move, Type, Square, Maximize2 
+  CheckCircle2, AlertTriangle, Trash2, Move, Type, Square, Maximize2,
+  Upload, Download
 } from 'lucide-react';
 
 interface LabelDesignerProps {
@@ -86,6 +87,7 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ZPL Templates Presets
   const presets = {
@@ -648,6 +650,49 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
     return zplCode;
   };
 
+  const handleExportZpl = () => {
+    const zpl = getActiveZpl();
+    const blob = new Blob([zpl], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `diseno_kanban_${labelWidth}x${labelHeight}_${labelDpi}dpi.zpl`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportZpl = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      if (text) {
+        setZplCode(text);
+        setOriginalZpl(''); // Mark as dirty
+        
+        // Parse raw ZPL into visual elements
+        const parsedElements = parseZplToElements(text);
+        setVisualElements(parsedElements);
+        
+        // Try parsing dimensions
+        const pwMatch = text.match(/\^PW(\d+)/);
+        if (pwMatch) {
+          setLabelWidth(parseFloat((parseInt(pwMatch[1]) / labelDpi).toFixed(2)));
+        }
+        const llMatch = text.match(/\^LL(\d+)/);
+        if (llMatch) {
+          setLabelHeight(parseFloat((parseInt(llMatch[1]) / labelDpi).toFixed(2)));
+        }
+
+        setSaveStatus({ type: 'success', message: 'Diseño importado correctamente. Recuerda guardar los cambios.' });
+        setTimeout(() => setSaveStatus({ type: null, message: '' }), 5000);
+      }
+    };
+    reader.readAsText(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const handleSaveTemplate = async () => {
     setSaveStatus({ type: null, message: '' });
     const targetZpl = getActiveZpl();
@@ -898,8 +943,36 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
         
         {/* Action buttons */}
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleImportZpl} 
+            accept=".zpl,.txt" 
+            style={{ display: 'none' }} 
+          />
+
           <button onClick={onClose} className="btn btn-secondary" style={{ padding: '8px 16px', fontSize: '13px' }}>
             Cerrar Diseñador
+          </button>
+
+          <button 
+            onClick={() => fileInputRef.current?.click()} 
+            className="btn btn-secondary" 
+            style={{ padding: '8px 16px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
+            title="Importar diseño ZPL desde archivo"
+          >
+            <Upload size={14} />
+            Importar
+          </button>
+
+          <button 
+            onClick={handleExportZpl} 
+            className="btn btn-secondary" 
+            style={{ padding: '8px 16px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
+            title="Exportar diseño actual a archivo .zpl"
+          >
+            <Download size={14} />
+            Exportar
           </button>
           
           <button 
