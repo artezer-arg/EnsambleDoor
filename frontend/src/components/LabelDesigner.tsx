@@ -50,10 +50,13 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
   const [useGrid, setUseGrid] = useState(true);
   const [showSimulatedValues, setShowSimulatedValues] = useState(true);
 
-  // Label settings
-  const [labelWidth, setLabelWidth] = useState(4); // in inches
-  const [labelHeight, setLabelHeight] = useState(3); // in inches
+  // Label settings (in centimeters)
+  const [labelWidthCm, setLabelWidthCm] = useState(10.16); // 4 inches * 2.54 = 10.16 cm
+  const [labelHeightCm, setLabelHeightCm] = useState(7.62); // 3 inches * 2.54 = 7.62 cm
   const [labelDpi, setLabelDpi] = useState(203); // 203, 300, 600
+
+  const labelWidth = parseFloat((labelWidthCm / 2.54).toFixed(3));
+  const labelHeight = parseFloat((labelHeightCm / 2.54).toFixed(3));
 
   // Drag state
   const [isDragging, setIsDragging] = useState(false);
@@ -164,8 +167,8 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
         const width = parseFloat(data.Printer_Label_Width_Inches) || 4;
         const height = parseFloat(data.Printer_Label_Height_Inches) || 3;
         const dpi = parseInt(data.Printer_Label_DPI) || 203;
-        setLabelWidth(width);
-        setLabelHeight(height);
+        setLabelWidthCm(parseFloat((width * 2.54).toFixed(2)));
+        setLabelHeightCm(parseFloat((height * 2.54).toFixed(2)));
         setLabelDpi(dpi);
 
         const template = data.Printer_Zpl_Template || presets.standard;
@@ -182,11 +185,11 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
         let finalHeight = height;
         if (pwMatch) {
           finalWidth = parseFloat((parseInt(pwMatch[1]) / dpi).toFixed(2));
-          setLabelWidth(finalWidth);
+          setLabelWidthCm(parseFloat((finalWidth * 2.54).toFixed(2)));
         }
         if (llMatch) {
           finalHeight = parseFloat((parseInt(llMatch[1]) / dpi).toFixed(2));
-          setLabelHeight(finalHeight);
+          setLabelHeightCm(parseFloat((finalHeight * 2.54).toFixed(2)));
         }
 
         fetchPreview(template, simData, finalWidth, finalHeight, dpi);
@@ -514,10 +517,12 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
       const pwMatch = zplCode.match(/\^PW(\d+)/i);
       const llMatch = zplCode.match(/\^LL(\d+)/i);
       if (pwMatch) {
-        setLabelWidth(parseFloat((parseInt(pwMatch[1]) / labelDpi).toFixed(2)));
+        const finalW = parseFloat((parseInt(pwMatch[1]) / labelDpi).toFixed(2));
+        setLabelWidthCm(parseFloat((finalW * 2.54).toFixed(2)));
       }
       if (llMatch) {
-        setLabelHeight(parseFloat((parseInt(llMatch[1]) / labelDpi).toFixed(2)));
+        const finalH = parseFloat((parseInt(llMatch[1]) / labelDpi).toFixed(2));
+        setLabelHeightCm(parseFloat((finalH * 2.54).toFixed(2)));
       }
     } else {
       // Generate ZPL code from visual elements
@@ -656,7 +661,7 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `diseno_kanban_${labelWidth}x${labelHeight}_${labelDpi}dpi.zpl`;
+    link.download = `diseno_kanban_${labelWidthCm}cm_x_${labelHeightCm}cm_${labelDpi}dpi.zpl`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -678,11 +683,13 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
         // Try parsing dimensions
         const pwMatch = text.match(/\^PW(\d+)/);
         if (pwMatch) {
-          setLabelWidth(parseFloat((parseInt(pwMatch[1]) / labelDpi).toFixed(2)));
+          const wInches = parseFloat((parseInt(pwMatch[1]) / labelDpi).toFixed(2));
+          setLabelWidthCm(parseFloat((wInches * 2.54).toFixed(2)));
         }
         const llMatch = text.match(/\^LL(\d+)/);
         if (llMatch) {
-          setLabelHeight(parseFloat((parseInt(llMatch[1]) / labelDpi).toFixed(2)));
+          const hInches = parseFloat((parseInt(llMatch[1]) / labelDpi).toFixed(2));
+          setLabelHeightCm(parseFloat((hInches * 2.54).toFixed(2)));
         }
 
         setSaveStatus({ type: 'success', message: 'Diseño importado correctamente. Recuerda guardar los cambios.' });
@@ -1310,29 +1317,29 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
             
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
               <div className="form-group" style={{ margin: 0 }}>
-                <label style={{ fontSize: '10px', marginBottom: '2px' }}>Ancho (pulgadas):</label>
+                <label style={{ fontSize: '10px', marginBottom: '2px' }}>Ancho (cm):</label>
                 <input 
                   type="number" 
                   step="0.1"
-                  min="1"
-                  max="10"
+                  min="2.5"
+                  max="30"
                   className="form-input" 
                   style={{ padding: '6px 10px', fontSize: '12px' }}
-                  value={labelWidth} 
-                  onChange={(e) => setLabelWidth(parseFloat(e.target.value) || 4)} 
+                  value={labelWidthCm} 
+                  onChange={(e) => setLabelWidthCm(parseFloat(e.target.value) || 10.16)} 
                 />
-              </div>
-              <div className="form-group" style={{ margin: 0 }}>
-                <label style={{ fontSize: '10px', marginBottom: '2px' }}>Alto (pulgadas):</label>
+               </div>
+               <div className="form-group" style={{ margin: 0 }}>
+                <label style={{ fontSize: '10px', marginBottom: '2px' }}>Alto (cm):</label>
                 <input 
                   type="number" 
                   step="0.1"
-                  min="1"
-                  max="10"
+                  min="2.5"
+                  max="30"
                   className="form-input" 
                   style={{ padding: '6px 10px', fontSize: '12px' }}
-                  value={labelHeight} 
-                  onChange={(e) => setLabelHeight(parseFloat(e.target.value) || 3)} 
+                  value={labelHeightCm} 
+                  onChange={(e) => setLabelHeightCm(parseFloat(e.target.value) || 7.62)} 
                 />
               </div>
             </div>
