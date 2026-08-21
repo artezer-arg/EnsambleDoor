@@ -1409,7 +1409,7 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
                         />
                       </div>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                        {['Puesto', 'Referencia', 'Ornamento', 'Secuencia', 'MinutosCurado', 'QrCompleto'].map(v => (
+                        {['Puesto', 'Referencia', 'Ornamento', 'OrdenProduccion', 'OrdenCliente', 'Secuencia', 'SD', 'Orden', 'Posicion', 'ManoCompuesta', 'Mano', 'MinutosCurado', 'QrCompleto', 'FechaLectura'].map(v => (
                           <button 
                             key={v}
                             onClick={() => updateSelectedElement({ content: `{${v}}` })}
