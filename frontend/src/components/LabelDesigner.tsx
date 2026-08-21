@@ -21,6 +21,8 @@ interface SimulatedData {
   qrCompleto: string;
   minutosCurado: number;
   mano: string;
+  posicion: string;
+  orden: number;
 }
 
 interface VisualElement {
@@ -77,7 +79,9 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
     sd: 'SD-420-A',
     qrCompleto: 'ORN-9988-X;202608061200;SERIAL-0042',
     minutosCurado: 300,
-    mano: 'F - 9988-X'
+    mano: 'LH',
+    posicion: 'FR',
+    orden: 1
   });
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -452,6 +456,9 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
         zplSimulated = zplSimulated.replace(/{OrdenCliente}/g, dataToUse.id_OrdenCliente.toString());
         zplSimulated = zplSimulated.replace(/{Secuencia}/g, dataToUse.secuencia.toString());
         zplSimulated = zplSimulated.replace(/{SD}/g, dataToUse.sd);
+        zplSimulated = zplSimulated.replace(/{Orden}/g, dataToUse.orden.toString());
+        zplSimulated = zplSimulated.replace(/{Posicion}/g, dataToUse.posicion);
+        zplSimulated = zplSimulated.replace(/{ManoCompuesta}/g, `${dataToUse.posicion} - ${dataToUse.mano}`);
         zplSimulated = zplSimulated.replace(/{Mano}/g, dataToUse.mano);
         zplSimulated = zplSimulated.replace(/{MinutosCurado}/g, dataToUse.minutosCurado.toString());
         zplSimulated = zplSimulated.replace(/{QrCompleto}/g, dataToUse.qrCompleto);
@@ -787,6 +794,9 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
     text = text.replace(/{OrdenCliente}/g, simData.id_OrdenCliente.toString());
     text = text.replace(/{Secuencia}/g, simData.secuencia.toString());
     text = text.replace(/{SD}/g, simData.sd);
+    text = text.replace(/{Orden}/g, simData.orden.toString());
+    text = text.replace(/{Posicion}/g, simData.posicion);
+    text = text.replace(/{ManoCompuesta}/g, `${simData.posicion} - ${simData.mano}`);
     text = text.replace(/{Mano}/g, simData.mano);
     text = text.replace(/{MinutosCurado}/g, simData.minutosCurado.toString() + ' min');
     text = text.replace(/{QrCompleto}/g, simData.qrCompleto);
@@ -1162,7 +1172,7 @@ export const LabelDesigner: React.FC<LabelDesignerProps> = ({ apiBaseUrl, onClos
                 overflowX: 'auto'
               }}>
                 <span style={{ fontSize: '11px', fontWeight: 700, color: '#b45309', marginRight: '6px' }}>Insertar Variable:</span>
-                {['Puesto', 'Referencia', 'Ornamento', 'OrdenProduccion', 'OrdenCliente', 'Secuencia', 'SD', 'Mano', 'MinutosCurado', 'QrCompleto', 'FechaLectura'].map(v => (
+                {['Puesto', 'Referencia', 'Ornamento', 'OrdenProduccion', 'OrdenCliente', 'Secuencia', 'SD', 'Orden', 'Posicion', 'ManoCompuesta', 'Mano', 'MinutosCurado', 'QrCompleto', 'FechaLectura'].map(v => (
                   <button 
                     key={v}
                     onClick={() => insertVariableInCodeEditor(v)}

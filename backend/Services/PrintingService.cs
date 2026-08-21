@@ -281,22 +281,27 @@ namespace Backend.Services
             output = output.Replace("{OrdenCliente}", val.ID_OrdenCliente.ToString());
             output = output.Replace("{Secuencia}", val.Secuencia?.ToString() ?? "N/A");
             output = output.Replace("{SD}", val.SD ?? "N/A");
+            output = output.Replace("{Orden}", val.Orden.ToString());
+            output = output.Replace("{Posicion}", val.Posicion ?? "");
             
             // Safe Mano / Pos extraction
-            string mano = "N/A";
+            string combinedMano = "N/A";
             if (!string.IsNullOrEmpty(val.Posicion) || !string.IsNullOrEmpty(val.Mano))
             {
-                mano = $"{val.Posicion ?? "N/A"} - {val.Mano ?? "N/A"}";
+                combinedMano = $"{val.Posicion ?? "N/A"} - {val.Mano ?? "N/A"}";
             }
             else if (!string.IsNullOrEmpty(val.CodigoOrnamentoLeido) && val.CodigoOrnamentoLeido.Length >= 5)
             {
-                mano = "F - " + val.CodigoOrnamentoLeido.Substring(val.CodigoOrnamentoLeido.Length - 5);
+                combinedMano = "F - " + val.CodigoOrnamentoLeido.Substring(val.CodigoOrnamentoLeido.Length - 5);
             }
             else if (!string.IsNullOrEmpty(val.CodigoOrnamentoLeido))
             {
-                mano = "F - " + val.CodigoOrnamentoLeido;
+                combinedMano = "F - " + val.CodigoOrnamentoLeido;
             }
-            output = output.Replace("{Mano}", mano);
+            output = output.Replace("{ManoCompuesta}", combinedMano);
+            
+            // Raw Mano from DB
+            output = output.Replace("{Mano}", val.Mano ?? "");
 
             output = output.Replace("{MinutosCurado}", val.MinutosCurado?.ToString() ?? "0");
             output = output.Replace("{QrCompleto}", val.QrCompleto ?? "");
