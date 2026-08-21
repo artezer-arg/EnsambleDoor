@@ -640,7 +640,7 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw', boxSizing: 'border-box', position: 'relative' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', boxSizing: 'border-box', position: 'relative' }}>
       
       {/* HEADER SECTION */}
       <header className="card-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '16px 16px 8px 16px', padding: '14px 24px' }}>
@@ -1069,7 +1069,7 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
       {showQrSimulator && (
         <div style={{
           position: 'absolute',
-          top: simulatorOpen ? '100px' : 'calc(100vh - 50px)',
+          top: simulatorOpen ? '100px' : 'calc(100% - 50px)',
           right: '24px',
           width: '320px',
           zIndex: 100,
