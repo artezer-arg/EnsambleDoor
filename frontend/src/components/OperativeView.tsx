@@ -649,7 +649,7 @@ export const OperativeView: React.FC<OperativeViewProps> = ({
             <Cpu size={24} className="pulse" style={{ color: 'var(--accent-color)' }} />
           </div>
           <div>
-            <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 800, letterSpacing: '-0.5px' }}>DL01 - ENSAMBLE DE ORNAMENTO</h1>
+            <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 800, letterSpacing: '-0.5px' }}>DL01 - ENSAMBLE DE DOOR</h1>
             <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>INDUSTRIAL QR MATCHING SYSTEM</span>
           </div>
         </div>
