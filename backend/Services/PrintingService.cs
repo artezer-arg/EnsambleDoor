@@ -199,6 +199,7 @@ namespace Backend.Services
 
                             doc.PrintPage += (sender, ev) =>
                             {
+                                if (ev.Graphics == null) return;
                                 try
                                 {
                                     if (!string.IsNullOrEmpty(result.Base64LabelPreview))
